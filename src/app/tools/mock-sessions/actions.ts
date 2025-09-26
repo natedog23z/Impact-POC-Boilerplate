@@ -11,6 +11,7 @@ import { composeOverallImpact } from '@/lib/compose/overall-impact';
 import { composeStrengthsImprovements } from '@/lib/compose/strengths-improvements';
 import { composeParticipantReasons } from '@/lib/compose/participant-reasons';
 import { composeKeyAreasChallenges } from '@/lib/compose/key-areas-challenges';
+import { composeKeyThemes } from '@/lib/compose/key-themes';
 import type { CohortFacts, SectionOutput, SessionFacts } from '@/types/schemas';
 
 const MAP_LIMIT = 8;
@@ -22,6 +23,7 @@ export type PipelineSections = {
   strengthsImprovements: SectionOutput;
   participantReasons: SectionOutput;
   keyAreasChallenges: SectionOutput;
+  keyThemes: SectionOutput;
 };
 
 export type PipelineMeta = {
@@ -83,13 +85,14 @@ export async function runImpactPipelineInline(rawSessions: RawSession[]): Promis
 
   const cohortFacts = buildCohortFacts(sessionFacts);
 
-  const [assessmentOutcomes, assessmentCategories, overallImpact, strengthsImprovements, participantReasons, keyAreasChallenges] = await Promise.all([
+  const [assessmentOutcomes, assessmentCategories, overallImpact, strengthsImprovements, participantReasons, keyAreasChallenges, keyThemes] = await Promise.all([
     composeAssessmentOutcomes(cohortFacts, { limiter }),
     composeAssessmentCategories(cohortFacts, { limiter }),
     composeOverallImpact(cohortFacts, { limiter }),
     composeStrengthsImprovements(cohortFacts, { limiter }),
     composeParticipantReasons(cohortFacts, { limiter }),
     composeKeyAreasChallenges(cohortFacts, { limiter }),
+    composeKeyThemes(cohortFacts, { limiter }),
   ]);
 
   return {
@@ -101,6 +104,7 @@ export async function runImpactPipelineInline(rawSessions: RawSession[]): Promis
       strengthsImprovements,
       participantReasons,
       keyAreasChallenges,
+      keyThemes,
     },
     sessionFacts,
     meta: {

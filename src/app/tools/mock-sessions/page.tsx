@@ -26,6 +26,7 @@ import ImprovementDonutCard from '@/components/dashboard/ImprovementDonutCard';
 import StrengthsImprovementsCard from '@/components/dashboard/StrengthsImprovementsCard';
 import ParticipantReasonsCard from '@/components/dashboard/ParticipantReasonsCard';
 import KeyAreasChallengesCard from '@/components/dashboard/KeyAreasChallengesCard';
+import KeyThemesCard from '@/components/dashboard/KeyThemesCard';
 import FlourishingOutcomesGrid from '@/components/dashboard/FlourishingOutcomesGrid';
 import { SURVEY_KEY_MAP } from '@/lib/mock-sessions/surveyKeys';
 
@@ -478,6 +479,14 @@ export default function MockSessionsPage() {
             proseRight={(data.sections.keyAreasChallenges.prose.split('\n\n')[1] || data.sections.keyAreasChallenges.prose) || ''}
             impacts={(data.sections.keyAreasChallenges.component as any).impacts || []}
             challenges={(data.sections.keyAreasChallenges.component as any).challenges || []}
+          />
+        </Box>
+        {/* Key Themes section */}
+        <Box style={{ marginTop: 12 }}>
+          <KeyThemesCard
+            prose={data.sections.keyThemes.prose}
+            themes={(data.sections.keyThemes.component as any).themes || []}
+            sourceNote="Source of Data"
           />
         </Box>
         {/* Strengths/Improvements section */}

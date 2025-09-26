@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
 
-import { composeOpenAI, defaultComposeLimiter, type ComposeOptions } from './shared';
+import { composeOpenAI, defaultComposeLimiter, extractFirstJsonObject, type ComposeOptions } from './shared';
 
 const MODEL_NAME = 'gpt-4o-mini';
 const proseSchema = z.object({
@@ -38,20 +38,31 @@ export async function composeAssessmentOutcomes(
   const limiter = options.limiter ?? defaultComposeLimiter;
   const modelName = options.model ?? MODEL_NAME;
 
-  const { object } = await limiter(() =>
-    generateObject({
-      model: composeOpenAI(modelName),
-      schema: proseSchema,
-      temperature: 0.3,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: buildAssessmentPrompt(cohort),
-        },
-      ],
-    }),
-  );
+  let object;
+  try {
+    ({ object } = await limiter(() =>
+      generateObject({
+        model: composeOpenAI(modelName),
+        schema: proseSchema,
+        temperature: 0.3,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: buildAssessmentPrompt(cohort),
+          },
+        ],
+      }),
+    ));
+  } catch (err: any) {
+    const raw = err?.text as string | undefined;
+    const recovered = raw ? extractFirstJsonObject(raw) : null;
+    if (recovered && typeof recovered === 'object' && recovered !== null && 'prose' in (recovered as any)) {
+      object = recovered as z.infer<typeof proseSchema>;
+    } else {
+      throw err;
+    }
+  }
 
   return {
     prose: object.prose.trim(),
