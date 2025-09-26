@@ -6,6 +6,7 @@ import type { RawSession } from '@/lib/mock-sessions/types';
 import { buildSessionFacts } from '@/lib/map/build-session-facts';
 import { buildCohortFacts } from '@/lib/reduce/build-cohort-facts';
 import { composeAssessmentOutcomes } from '@/lib/compose/assessment-outcomes';
+import { composeAssessmentCategories } from '@/lib/compose/assessment-categories';
 import { composeOverallImpact } from '@/lib/compose/overall-impact';
 import { composeStrengthsImprovements } from '@/lib/compose/strengths-improvements';
 import { composeParticipantReasons } from '@/lib/compose/participant-reasons';
@@ -15,6 +16,7 @@ const MAP_LIMIT = 8;
 
 export type PipelineSections = {
   assessmentOutcomes: SectionOutput;
+  assessmentCategories: SectionOutput;
   overallImpact: SectionOutput;
   strengthsImprovements: SectionOutput;
   participantReasons: SectionOutput;
@@ -79,8 +81,9 @@ export async function runImpactPipelineInline(rawSessions: RawSession[]): Promis
 
   const cohortFacts = buildCohortFacts(sessionFacts);
 
-  const [assessmentOutcomes, overallImpact, strengthsImprovements, participantReasons] = await Promise.all([
+  const [assessmentOutcomes, assessmentCategories, overallImpact, strengthsImprovements, participantReasons] = await Promise.all([
     composeAssessmentOutcomes(cohortFacts, { limiter }),
+    composeAssessmentCategories(cohortFacts, { limiter }),
     composeOverallImpact(cohortFacts, { limiter }),
     composeStrengthsImprovements(cohortFacts, { limiter }),
     composeParticipantReasons(cohortFacts, { limiter }),
@@ -90,6 +93,7 @@ export async function runImpactPipelineInline(rawSessions: RawSession[]): Promis
     cohortFacts,
     sections: {
       assessmentOutcomes,
+      assessmentCategories,
       overallImpact,
       strengthsImprovements,
       participantReasons,

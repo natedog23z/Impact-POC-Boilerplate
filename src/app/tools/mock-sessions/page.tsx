@@ -25,6 +25,7 @@ import OverallImpactCard from '@/components/dashboard/OverallImpactCard';
 import ImprovementDonutCard from '@/components/dashboard/ImprovementDonutCard';
 import StrengthsImprovementsCard from '@/components/dashboard/StrengthsImprovementsCard';
 import ParticipantReasonsCard from '@/components/dashboard/ParticipantReasonsCard';
+import FlourishingOutcomesGrid from '@/components/dashboard/FlourishingOutcomesGrid';
 import { SURVEY_KEY_MAP } from '@/lib/mock-sessions/surveyKeys';
 
 const DEFAULT_SENTIMENT_MIX = {
@@ -486,36 +487,15 @@ export default function MockSessionsPage() {
           />
         </Box>
         <Separator style={{ marginTop: 16, marginBottom: 16 }} />
-        <Heading size="3">Assessment Outcomes</Heading>
-        <Text style={{ marginTop: 8 }}>{data.sections.assessmentOutcomes.prose}</Text>
-        {Array.isArray(series) && series.length > 0 ? (
-          <Table.Root style={{ marginTop: 12 }}>
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeaderCell>Assessment</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>Avg Pre</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>Avg Post</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>Avg Change</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>% Improved</Table.ColumnHeaderCell>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {series.map((s) => (
-                <Table.Row key={s.key}>
-                  <Table.Cell>{s.label}</Table.Cell>
-                  <Table.Cell>{formatNumber(s.avgPre)}</Table.Cell>
-                  <Table.Cell>{formatNumber(s.avgPost)}</Table.Cell>
-                  <Table.Cell>{formatNumber(s.avgChange)}</Table.Cell>
-                  <Table.Cell>{formatPercentDisplay(s.pctImproved)}</Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
-        ) : (
-          <Text color="gray" style={{ marginTop: 8 }}>
-            No quantitative assessments available.
-          </Text>
-        )}
+        <FlourishingOutcomesGrid
+          prose={data.sections.assessmentOutcomes.prose}
+          categories={((data.sections.assessmentCategories.component as any)?.categories || []).map((c: any) => ({
+            key: c.key,
+            title: c.title,
+            description: c.description,
+            percentImproved: c.percentImproved ?? null,
+          }))}
+        />
         <Separator style={{ marginTop: 16, marginBottom: 16 }} />
         <Heading size="3">CohortFacts (debug)</Heading>
         <TextArea readOnly value={JSON.stringify(data.cohortFacts, null, 2)} style={{ fontFamily: 'monospace', minHeight: 200 }} />
