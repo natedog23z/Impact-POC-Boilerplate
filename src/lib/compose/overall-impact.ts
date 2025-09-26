@@ -10,7 +10,7 @@ const proseSchema = z.object({
   prose: z.string().min(1).max(800),
 });
 
-const SYSTEM_PROMPT = `You summarize overall program impact for an executive dashboard. Use only the supplied cohort facts. Emphasize scale (sessions), milestone completion, notable qualitative signals, and key data-quality caveats. Keep prose under 120 words, clear and confident, and avoid hype.`;
+const SYSTEM_PROMPT = `You are summarizing overall program impact for donors in an executive dashboard. Use ONLY the supplied cohort facts. Lead with scale (participants/sessions) and verified completion %, then the top 1–2 outcomes (pre→post signals or habit formation). Include exactly one short beneficiary quote if available. Close with a single sentence on next-step focus. Keep it under 120 words, confident, concrete, and free of hype or jargon. Acknowledge any data-quality notes in one clause if present.`;
 
 export async function composeOverallImpact(
   cohort: CohortFacts,

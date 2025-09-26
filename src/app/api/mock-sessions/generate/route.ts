@@ -891,7 +891,8 @@ async function generateSession(options: {
       const mdParsed = parseMockSession(text);
       const rawFromJson = parseJsonFooter(extracted.jsonText);
 
-      let rawSession = rawFromJson ?? parseMockSession(text);
+      // Source of truth: always derive RawSession from the markdown document
+      let rawSession = mdParsed;
       rawSession = {
         ...rawSession,
         rawSchemaVersion: 'v1',
@@ -932,7 +933,8 @@ async function generateSession(options: {
           idx,
           sentiment,
           omittedPct: payload.omitProbability,
-          parsePath: rawFromJson ? 'json' : 'md',
+          // We always canonicalize from markdown; ignore model-supplied JSON
+          parsePath: 'md',
           retried: strictMode,
           needsManualFix: false,
         },
