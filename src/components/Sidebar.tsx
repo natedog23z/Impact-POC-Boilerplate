@@ -3,6 +3,7 @@
 import { Flex, Text, Link, Box, Button, DropdownMenu, Avatar } from "@radix-ui/themes";
 import { House } from "@phosphor-icons/react/dist/ssr/House";
 import { Database } from "@phosphor-icons/react/dist/ssr/Database";
+import { MagicWand } from "@phosphor-icons/react/dist/ssr/MagicWand";
 import { SignOut } from "@phosphor-icons/react/dist/ssr/SignOut";
 import { User } from "@phosphor-icons/react/dist/ssr/User";
 import { UserGear } from "@phosphor-icons/react/dist/ssr/UserGear";
@@ -111,6 +112,36 @@ export function Sidebar() {
                   lineHeight: '24px',
                 }}>
                   Supabase Studio
+                </Text>
+              </Flex>
+            </Box>
+          </Link>
+
+          {/** Impact Reports removed per request */}
+
+          {/* Mock Sessions tool */}
+          <Link href="/tools/mock-sessions">
+            <Box
+              style={{
+                padding: 12,
+                borderRadius: 8,
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+              }}
+              className="nav-item"
+            >
+              <Flex align="center" gap="3">
+                <Box style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <MagicWand size={20} color="var(--gray-12)" />
+                </Box>
+                <Text size="3" weight="medium" style={{
+                  color: 'var(--gray-12)',
+                  fontFamily: 'F37Jan',
+                  fontSize: 16,
+                  fontWeight: 400,
+                  lineHeight: '24px',
+                }}>
+                  Mock Sessions
                 </Text>
               </Flex>
             </Box>

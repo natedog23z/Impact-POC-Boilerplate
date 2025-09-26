@@ -1,7 +1,7 @@
 'use client'
 
 import { Theme } from "@radix-ui/themes"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext } from "react"
 
 interface ThemeContextType {
   theme: 'light' | 'dark'
@@ -22,25 +22,11 @@ export const useTheme = () => {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
-
-  useEffect(() => {
-    // Check initial system preference
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    setTheme(mediaQuery.matches ? 'dark' : 'light')
-    
-    // Listen for system theme changes
-    const handleChange = (e: MediaQueryListEvent) => {
-      setTheme(e.matches ? 'dark' : 'light')
-    }
-    
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [])
+  const theme: 'light' | 'dark' = 'light'
 
   const contextValue = {
     theme,
-    isDark: theme === 'dark'
+    isDark: false
   }
 
   return (

@@ -1,11 +1,10 @@
-import { Configuration, OpenAIApi } from 'openai-edge';
-import { OpenAIStream, StreamingTextResponse } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+import type { CoreMessage } from 'ai';
 
-// Create an OpenAI API client (that's edge-friendly!)
-const config = new Configuration({
+const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-const openai = new OpenAIApi(config);
 
 // IMPORTANT! Set the runtime to edge
 export const runtime = 'edge';
@@ -37,8 +36,15 @@ export const runtime = 'edge';
  * // Process streaming response...
  * ```
  */
+type ChatRequest = {
+  messages: CoreMessage[];
+  systemPrompt?: string;
+};
+
 export async function POST(req: Request) {
-  const { messages, systemPrompt } = await req.json();
+  const { messages, systemPrompt } = (await req.json()) as ChatRequest;
+
+  const chatHistory = messages ?? [];
 
   // Default system prompt for Gloo Impact automation tasks
   const defaultSystemPrompt = `You are an AI assistant for Gloo Impact, a platform focused on maximizing philanthropy with precision and transparency. 
@@ -53,20 +59,16 @@ export async function POST(req: Request) {
   Always provide accurate, concise, and professional responses.`;
 
   // Ask OpenAI for a streaming completion given the prompt
-  const response = await openai.createChatCompletion({
-    model: 'gpt-4o-mini',
-    stream: true,
+  const result = await streamText({
+    model: openai('gpt-4o-mini'),
     messages: [
       {
         role: 'system',
         content: systemPrompt || defaultSystemPrompt,
       },
-      ...messages,
+      ...chatHistory,
     ],
   });
 
-  // Convert the response into a friendly text-stream
-  const stream = OpenAIStream(response);
-  // Respond with the stream
-  return new StreamingTextResponse(stream);
+  return result.toTextStreamResponse();
 }
