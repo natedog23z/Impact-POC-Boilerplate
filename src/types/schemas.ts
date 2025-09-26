@@ -66,6 +66,7 @@ export const cohortFactsSchema = z.object({
   topImprovements: z.array(cohortTagSchema).max(10),
   topThemes: z.array(cohortTagSchema).max(10),
   topChallenges: z.array(cohortTagSchema).max(10),
+  topReasons: z.array(cohortTagSchema).max(10),
   exemplarQuotes: z.array(sessionQuoteSchema).max(8),
   dataQualityNotes: z.array(z.string().min(1)).max(12),
   factsHash: z.string().min(1),

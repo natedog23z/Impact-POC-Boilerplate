@@ -6,6 +6,7 @@ import pLimit from 'p-limit';
 
 import { composeAssessmentOutcomes } from '@/lib/compose/assessment-outcomes';
 import { composeOverallImpact } from '@/lib/compose/overall-impact';
+import { composeParticipantReasons } from '@/lib/compose/participant-reasons';
 import { cohortFactsSchema, type CohortFacts } from '@/types/schemas';
 
 const DEFAULT_CONCURRENCY = 2;
@@ -24,17 +25,20 @@ async function main() {
   const cohortFacts = await loadCohortFacts(inputFile);
   const limiter = pLimit(DEFAULT_CONCURRENCY);
 
-  const [assessmentOutcomes, overallImpact] = await Promise.all([
+  const [assessmentOutcomes, overallImpact, participantReasons] = await Promise.all([
     composeAssessmentOutcomes(cohortFacts, { limiter }),
     composeOverallImpact(cohortFacts, { limiter }),
+    composeParticipantReasons(cohortFacts, { limiter }),
   ]);
 
   await writeFile(join(outputDir, 'assessment-outcomes.json'), JSON.stringify(assessmentOutcomes, null, 2), 'utf8');
   await writeFile(join(outputDir, 'overall-impact.json'), JSON.stringify(overallImpact, null, 2), 'utf8');
+  await writeFile(join(outputDir, 'participant-reasons.json'), JSON.stringify(participantReasons, null, 2), 'utf8');
 
   console.log('Generated composer outputs:');
   console.log(`- Assessment Outcomes: ${assessmentOutcomes.prose}`);
   console.log(`- Overall Impact: ${overallImpact.prose}`);
+  console.log(`- Participant Reasons: ${participantReasons.prose}`);
 }
 
 function parseArgs(argv: string[]): CliArgs {

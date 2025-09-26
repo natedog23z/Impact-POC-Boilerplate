@@ -43,6 +43,7 @@ export function buildCohortFacts(
   const topImprovements = buildTagCounts(cohortSessions, (session) => session.improvements);
   const topThemes = buildTagCounts(cohortSessions, (session) => session.themes);
   const topChallenges = buildTagCounts(cohortSessions, (session) => session.challenges);
+  const topReasons = buildTagCounts(cohortSessions, (session) => session.reasons);
   const exemplarQuotes = pickExemplarQuotes(cohortSessions);
   const dataQualityNotes = buildDataQualityNotes({
     sessions: cohortSessions,
@@ -64,6 +65,7 @@ export function buildCohortFacts(
     topImprovements,
     topThemes,
     topChallenges,
+    topReasons,
     exemplarQuotes,
     dataQualityNotes,
   } satisfies Omit<CohortFacts, 'factsHash'>;
@@ -288,6 +290,7 @@ function hashFacts(facts: Omit<CohortFacts, 'factsHash'>): string {
     topImprovements: facts.topImprovements.map((entry) => ({ ...entry })),
     topThemes: facts.topThemes.map((entry) => ({ ...entry })),
     topChallenges: facts.topChallenges.map((entry) => ({ ...entry })),
+    topReasons: facts.topReasons.map((entry) => ({ ...entry })),
     exemplarQuotes: facts.exemplarQuotes.map((quote) => ({ ...quote })),
     dataQualityNotes: facts.dataQualityNotes.slice(),
   };

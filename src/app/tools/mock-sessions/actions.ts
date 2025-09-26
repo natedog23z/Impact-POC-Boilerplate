@@ -8,6 +8,7 @@ import { buildCohortFacts } from '@/lib/reduce/build-cohort-facts';
 import { composeAssessmentOutcomes } from '@/lib/compose/assessment-outcomes';
 import { composeOverallImpact } from '@/lib/compose/overall-impact';
 import { composeStrengthsImprovements } from '@/lib/compose/strengths-improvements';
+import { composeParticipantReasons } from '@/lib/compose/participant-reasons';
 import type { CohortFacts, SectionOutput, SessionFacts } from '@/types/schemas';
 
 const MAP_LIMIT = 8;
@@ -16,6 +17,7 @@ export type PipelineSections = {
   assessmentOutcomes: SectionOutput;
   overallImpact: SectionOutput;
   strengthsImprovements: SectionOutput;
+  participantReasons: SectionOutput;
 };
 
 export type PipelineMeta = {
@@ -77,10 +79,11 @@ export async function runImpactPipelineInline(rawSessions: RawSession[]): Promis
 
   const cohortFacts = buildCohortFacts(sessionFacts);
 
-  const [assessmentOutcomes, overallImpact, strengthsImprovements] = await Promise.all([
+  const [assessmentOutcomes, overallImpact, strengthsImprovements, participantReasons] = await Promise.all([
     composeAssessmentOutcomes(cohortFacts, { limiter }),
     composeOverallImpact(cohortFacts, { limiter }),
     composeStrengthsImprovements(cohortFacts, { limiter }),
+    composeParticipantReasons(cohortFacts, { limiter }),
   ]);
 
   return {
@@ -89,6 +92,7 @@ export async function runImpactPipelineInline(rawSessions: RawSession[]): Promis
       assessmentOutcomes,
       overallImpact,
       strengthsImprovements,
+      participantReasons,
     },
     sessionFacts,
     meta: {

@@ -24,6 +24,7 @@ import { runImpactPipelineInline, type RunPipelineInlineResponse } from './actio
 import OverallImpactCard from '@/components/dashboard/OverallImpactCard';
 import ImprovementDonutCard from '@/components/dashboard/ImprovementDonutCard';
 import StrengthsImprovementsCard from '@/components/dashboard/StrengthsImprovementsCard';
+import ParticipantReasonsCard from '@/components/dashboard/ParticipantReasonsCard';
 import { SURVEY_KEY_MAP } from '@/lib/mock-sessions/surveyKeys';
 
 const DEFAULT_SENTIMENT_MIX = {
@@ -476,6 +477,14 @@ export default function MockSessionsPage() {
             improvements={(data.sections.strengthsImprovements.component as any).improvements || []}
           />
         </Box>
+        {/* Participant Reasons section */}
+        <Box style={{ marginTop: 12 }}>
+          <ParticipantReasonsCard
+            prose={data.sections.participantReasons.prose}
+            reasons={(data.sections.participantReasons.component as any).reasons || []}
+            offeringName={extractOfferingNameFromHeader(lockedHeader)}
+          />
+        </Box>
         <Separator style={{ marginTop: 16, marginBottom: 16 }} />
         <Heading size="3">Assessment Outcomes</Heading>
         <Text style={{ marginTop: 8 }}>{data.sections.assessmentOutcomes.prose}</Text>
@@ -521,6 +530,14 @@ export default function MockSessionsPage() {
   const formatPercentDisplay = (value: number | null): string => {
     if (value === null || Number.isNaN(value)) return '--';
     return `${(value * 100).toFixed(0)}%`;
+  };
+
+  const extractOfferingNameFromHeader = (header: string): string | undefined => {
+    const match = header.match(/Program\s*:\s*(.+)/i) || header.match(/Offering\s*:\s*(.+)/i) || header.match(/^#\s*(.+)$/m);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    return undefined;
   };
 
   // Inline improvement breakdown matching /reports
