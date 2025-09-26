@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Box, Button, Card, Flex, Text, Progress } from '@radix-ui/themes';
+import { Box, Button, Flex, Text, Progress } from '@radix-ui/themes';
+import BorderedCard from '@/components/BorderedCard';
 import { CloudArrowUp, Image, X, Check } from '@phosphor-icons/react';
 import { uploadFile, validateFile, UploadResult } from '@/lib/storage';
 
@@ -108,7 +109,7 @@ export function FileUpload({
   return (
     <Box className={className}>
       {/* Upload Area */}
-      <Card
+      <BorderedCard
         className={`border-2 border-dashed transition-colors cursor-pointer ${
           isDragging
             ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
@@ -147,7 +148,7 @@ export function FileUpload({
             </Box>
           )}
         </Flex>
-      </Card>
+      </BorderedCard>
 
       {/* Hidden file input */}
       <input
@@ -161,7 +162,7 @@ export function FileUpload({
 
       {/* Error message */}
       {error && (
-        <Card className="mt-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+        <BorderedCard className="mt-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
           <Flex align="center" justify="between" className="p-3">
             <Text size="2" color="red">
               {error}
@@ -170,7 +171,7 @@ export function FileUpload({
               <X size={14} />
             </Button>
           </Flex>
-        </Card>
+        </BorderedCard>
       )}
 
       {/* Preview uploaded files */}
@@ -181,7 +182,7 @@ export function FileUpload({
           </Text>
           <Flex wrap="wrap" gap="3">
             {uploadedFiles.map((file, index) => (
-              <Card key={index} className="relative group">
+              <BorderedCard key={index} className="relative group">
                 <Box className="w-24 h-24 overflow-hidden rounded">
                   {file.url && (
                     <img
@@ -211,7 +212,7 @@ export function FileUpload({
                 >
                   <X size={12} />
                 </Button>
-              </Card>
+              </BorderedCard>
             ))}
           </Flex>
         </Box>

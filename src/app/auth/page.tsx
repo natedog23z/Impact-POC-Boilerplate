@@ -1,12 +1,13 @@
 'use client'
 
-import { Flex, Text, Box, Button, Card } from "@radix-ui/themes"
+import { Flex, Text, Box, Button } from "@radix-ui/themes"
 import { useState } from "react"
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { sendCustomSignupConfirmation } from '@/lib/auth-config'
 import { ThemeLogo } from '@/components/ThemeLogo'
+import BorderedCard from '@/components/BorderedCard'
 
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -104,7 +105,7 @@ export default function AuthPage() {
               
               {/* Message */}
               {message && (
-                <Box style={{
+                <BorderedCard style={{
                   padding: '12px 16px',
                   borderRadius: '8px',
                   backgroundColor: message.includes('error') || message.includes('Invalid') ? 'var(--red-2)' : 'var(--blue-2)',
@@ -115,7 +116,7 @@ export default function AuthPage() {
                   }}>
                     {message}
                   </Text>
-                </Box>
+                </BorderedCard>
               )}
               
               {/* Name Input - Only for Sign Up */}

@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { Box, Card, Flex, Heading, Separator, Text } from "@radix-ui/themes";
+import { Box, Flex, Heading, Separator, Text } from "@radix-ui/themes";
 import DonutChart, { type DonutSegment } from "./DonutChart";
+import BorderedCard from "@/components/BorderedCard";
 
 export type ImprovementBreakdown = {
   significant: number; // 0..1
@@ -26,15 +27,11 @@ export default function ImprovementDonutCard({ headingPercent, nCompleted, break
   const pct = Math.round((headingPercent || 0) * 100);
 
   return (
-    <Card
-      variant="surface"
+    <BorderedCard
       style={{
         padding: 24,
-        borderRadius: 18,
         minHeight: 220,
-        boxSizing: 'border-box',
-        border: '1px solid var(--gray-5)',
-        boxShadow: '0 12px 32px rgba(15, 23, 42, 0.08)',
+        boxSizing: "border-box",
       }}
     >
       <Flex gap="4" align="center">
@@ -54,7 +51,7 @@ export default function ImprovementDonutCard({ headingPercent, nCompleted, break
           </Flex>
         </Box>
       </Flex>
-    </Card>
+    </BorderedCard>
   );
 }
 

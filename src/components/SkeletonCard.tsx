@@ -1,6 +1,7 @@
 'use client'
 
-import { Card, Skeleton, Flex, Box, Text, Badge } from "@radix-ui/themes"
+import { Skeleton, Flex, Box, Text, Badge } from "@radix-ui/themes"
+import BorderedCard from "@/components/BorderedCard"
 
 interface SkeletonCardProps {
   title?: string
@@ -16,7 +17,7 @@ export function SkeletonCard({
   children 
 }: SkeletonCardProps) {
   return (
-    <Card style={{ padding, height }}>
+    <BorderedCard style={{ padding, height }}>
       <Flex direction="column" gap="4">
         {title && (
           <Flex justify="between" align="center">
@@ -26,7 +27,7 @@ export function SkeletonCard({
         )}
         {children}
       </Flex>
-    </Card>
+    </BorderedCard>
   )
 }
 
@@ -43,7 +44,7 @@ export function StatCard({
   subText?: string
 }) {
   return (
-    <Card style={{ padding: "20px" }}>
+    <BorderedCard style={{ padding: "20px" }}>
       <Flex direction="column" gap="2">
         <Text size="2" color="gray" weight="medium">{label}</Text>
         <Skeleton width="60px" height="32px" />
@@ -52,7 +53,7 @@ export function StatCard({
           {subText && <Text size="1" color="gray">{subText}</Text>}
         </Flex>
       </Flex>
-    </Card>
+    </BorderedCard>
   )
 }
 

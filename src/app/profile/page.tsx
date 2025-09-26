@@ -1,10 +1,11 @@
 'use client'
 
-import { Heading, Text, Flex, Box, Card, TextField, Button, Separator } from "@radix-ui/themes"
+import { Heading, Text, Flex, Box, TextField, Button, Separator } from "@radix-ui/themes"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/AuthProvider"
 import { DashboardLayout } from "@/components/DashboardLayout"
 import { useToast } from "@/components/ToastProvider"
+import BorderedCard from "@/components/BorderedCard"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { supabase } from "@/lib/supabase"
 import { sendCustomPasswordReset } from "@/lib/auth-config"
@@ -249,7 +250,7 @@ export default function ProfilePage() {
     >
 
         {/* Profile Information */}
-        <Card style={{ padding: '24px' }}>
+        <BorderedCard style={{ padding: '24px' }}>
           <Flex direction="column" gap="4">
             <Flex align="center" gap="3">
               <User size={20} color="var(--gray-12)" />
@@ -308,12 +309,12 @@ export default function ProfilePage() {
               </Flex>
             </form>
           </Flex>
-        </Card>
+        </BorderedCard>
 
         <Separator size="4" />
 
         {/* Password Change */}
-        <Card style={{ padding: '24px' }}>
+        <BorderedCard style={{ padding: '24px' }}>
           <Flex direction="column" gap="4">
             <Flex align="center" gap="3">
               <Lock size={20} color="var(--gray-12)" />
@@ -376,7 +377,7 @@ export default function ProfilePage() {
               </Button>
             </Box>
           </Flex>
-        </Card>
+        </BorderedCard>
     </DashboardLayout>
   )
 }
