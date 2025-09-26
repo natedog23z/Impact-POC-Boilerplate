@@ -23,6 +23,7 @@ import { extractProgramHeaderBlock, extractMilestoneOutline } from '@/lib/mock-s
 import { runImpactPipelineInline, type RunPipelineInlineResponse } from './actions';
 import OverallImpactCard from '@/components/dashboard/OverallImpactCard';
 import ImprovementDonutCard from '@/components/dashboard/ImprovementDonutCard';
+import StrengthsImprovementsCard from '@/components/dashboard/StrengthsImprovementsCard';
 import { SURVEY_KEY_MAP } from '@/lib/mock-sessions/surveyKeys';
 
 const DEFAULT_SENTIMENT_MIX = {
@@ -466,6 +467,14 @@ export default function MockSessionsPage() {
             />
           </Box>
         </Flex>
+        </Box>
+        {/* Strengths/Improvements section */}
+        <Box style={{ marginTop: 12 }}>
+          <StrengthsImprovementsCard
+            prose={data.sections.strengthsImprovements.prose}
+            strengths={(data.sections.strengthsImprovements.component as any).strengths || []}
+            improvements={(data.sections.strengthsImprovements.component as any).improvements || []}
+          />
         </Box>
         <Separator style={{ marginTop: 16, marginBottom: 16 }} />
         <Heading size="3">Assessment Outcomes</Heading>
