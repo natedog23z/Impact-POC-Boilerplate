@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
 
-import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt } from './shared';
+import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt, logComposeRequest, logComposeSuccess, logComposeError } from './shared';
 import { OVERALL_IMPACT_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
@@ -24,26 +24,29 @@ export async function composeOverallImpact(
 
   let object;
   try {
+    const systemMsg = guardSystemPrompt(options.prompts?.system ?? OVERALL_IMPACT_SYSTEM_PROMPT, 800);
+    const userMsg = (() => {
+      const base = buildImpactPrompt(cohort, quotes);
+      if (options.prompts?.user) return options.prompts.user;
+      if (options.prompts?.userInstructions) return `${base}\n\nAdditional instructions:\n${options.prompts.userInstructions}`;
+      return base;
+    })();
+
+    logComposeRequest('overallImpact', modelName, systemMsg, userMsg, options.prompts);
     ({ object } = await limiter(() =>
       generateObject({
         model: composeOpenAI(modelName),
         schema: proseSchema,
         temperature: 0.35,
         messages: [
-          { role: 'system', content: guardSystemPrompt(options.prompts?.system ?? OVERALL_IMPACT_SYSTEM_PROMPT, 800) },
-          {
-            role: 'user',
-            content: (() => {
-              const base = buildImpactPrompt(cohort, quotes);
-              if (options.prompts?.user) return options.prompts.user;
-              if (options.prompts?.userInstructions) return `${base}\n\nAdditional instructions:\n${options.prompts.userInstructions}`;
-              return base;
-            })(),
-          },
+          { role: 'system', content: systemMsg },
+          { role: 'user', content: userMsg },
         ],
       }),
     ));
+    logComposeSuccess('overallImpact', object);
   } catch (err: any) {
+    logComposeError('overallImpact', err);
     // Best-effort fallback: try to salvage prose from text, then enforce length
     const text: string | undefined = err?.text;
     if (text) {

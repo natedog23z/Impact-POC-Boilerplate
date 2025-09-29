@@ -31,6 +31,52 @@ export function guardSystemPrompt(systemPrompt: string, proseCharLimit: number =
   return `${systemPrompt}${guard}`;
 }
 
+// --- Logging helpers (server-side only) ---
+const SHOULD_LOG = Boolean(process.env.COMPOSE_LOG_PROMPTS);
+const MAX_LOG_CHARS = Number(process.env.COMPOSE_LOG_MAX ?? 2000);
+
+function truncate(text: string, max: number): string {
+  if (!text) return '';
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.floor(max * 0.7))}\n... [${text.length - Math.floor(max * 0.7)} chars omitted] ...\n${text.slice(-Math.floor(max * 0.3))}`;
+}
+
+export function logComposeRequest(
+  section: string,
+  modelName: string,
+  systemMessage: string,
+  userMessage: string,
+  prompts?: PromptOverrides,
+): void {
+  if (!SHOULD_LOG) return;
+  try {
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n[COMPOSE][REQUEST] ${section} -> ${modelName}\n` +
+        `system:\n${truncate(systemMessage, MAX_LOG_CHARS)}\n\n` +
+        `user:\n${truncate(userMessage, MAX_LOG_CHARS)}\n` +
+        (prompts ? `overrides: ${JSON.stringify(prompts)}\n` : ''),
+    );
+  } catch {}
+}
+
+export function logComposeSuccess(section: string, result: unknown): void {
+  if (!SHOULD_LOG) return;
+  try {
+    const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+    // eslint-disable-next-line no-console
+    console.log(`\n[COMPOSE][SUCCESS] ${section}\n${truncate(text, MAX_LOG_CHARS)}\n`);
+  } catch {}
+}
+
+export function logComposeError(section: string, error: unknown): void {
+  if (!SHOULD_LOG) return;
+  try {
+    // eslint-disable-next-line no-console
+    console.error(`\n[COMPOSE][ERROR] ${section}`, error);
+  } catch {}
+}
+
 // Best-effort recovery: extract the first complete JSON object from a string
 // Useful when models accidentally duplicate JSON outputs causing parse failures upstream
 export function extractFirstJsonObject(text: string): unknown | null {

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
 
-import { composeOpenAI, defaultComposeLimiter, extractFirstJsonObject, type ComposeOptions, guardSystemPrompt } from './shared';
+import { composeOpenAI, defaultComposeLimiter, extractFirstJsonObject, type ComposeOptions, guardSystemPrompt, logComposeRequest, logComposeSuccess, logComposeError } from './shared';
 import { ASSESSMENT_OUTCOMES_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
@@ -41,26 +41,28 @@ export async function composeAssessmentOutcomes(
 
   let object;
   try {
+    const systemMsg = guardSystemPrompt(options.prompts?.system ?? ASSESSMENT_OUTCOMES_SYSTEM_PROMPT, 800);
+    const userMsg = (() => {
+      const base = buildAssessmentPrompt(cohort);
+      if (options.prompts?.user) return options.prompts.user;
+      if (options.prompts?.userInstructions) return `${base}\n\nAdditional instructions:\n${options.prompts.userInstructions}`;
+      return base;
+    })();
+    logComposeRequest('assessmentOutcomes', modelName, systemMsg, userMsg, options.prompts);
     ({ object } = await limiter(() =>
       generateObject({
         model: composeOpenAI(modelName),
         schema: proseSchema,
         temperature: 0.3,
         messages: [
-          { role: 'system', content: guardSystemPrompt(options.prompts?.system ?? ASSESSMENT_OUTCOMES_SYSTEM_PROMPT, 800) },
-          {
-            role: 'user',
-            content: (() => {
-              const base = buildAssessmentPrompt(cohort);
-              if (options.prompts?.user) return options.prompts.user;
-              if (options.prompts?.userInstructions) return `${base}\n\nAdditional instructions:\n${options.prompts.userInstructions}`;
-              return base;
-            })(),
-          },
+          { role: 'system', content: systemMsg },
+          { role: 'user', content: userMsg },
         ],
       }),
     ));
+    logComposeSuccess('assessmentOutcomes', object);
   } catch (err: any) {
+    logComposeError('assessmentOutcomes', err);
     const raw = err?.text as string | undefined;
     const recovered = raw ? extractFirstJsonObject(raw) : null;
     if (recovered && typeof recovered === 'object' && recovered !== null && 'prose' in (recovered as any)) {

@@ -2,7 +2,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
-import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt } from './shared';
+import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt, logComposeRequest, logComposeSuccess, logComposeError } from './shared';
 import { STRENGTHS_IMPROVEMENTS_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
@@ -29,24 +29,25 @@ export async function composeStrengthsImprovements(
 
   const payload = buildPromptPayload(cohort);
 
+  const systemMsg = guardSystemPrompt(options.prompts?.system ?? STRENGTHS_IMPROVEMENTS_SYSTEM_PROMPT, 800);
+  const userMsg = options.prompts?.user
+    ? options.prompts.user
+    : options.prompts?.userInstructions
+    ? `${payload}\n\nAdditional instructions:\n${options.prompts.userInstructions}`
+    : payload;
+  logComposeRequest('strengthsImprovements', modelName, systemMsg, userMsg, options.prompts);
   const { object } = await limiter(() =>
     generateObject({
       model: composeOpenAI(modelName),
       schema: responseSchema,
       temperature: 0.35,
       messages: [
-        { role: 'system', content: guardSystemPrompt(options.prompts?.system ?? STRENGTHS_IMPROVEMENTS_SYSTEM_PROMPT, 800) },
-        {
-          role: 'user',
-          content: options.prompts?.user
-            ? options.prompts.user
-            : options.prompts?.userInstructions
-            ? `${payload}\n\nAdditional instructions:\n${options.prompts.userInstructions}`
-            : payload,
-        },
+        { role: 'system', content: systemMsg },
+        { role: 'user', content: userMsg },
       ],
     }),
   );
+  logComposeSuccess('strengthsImprovements', object);
 
   return {
     prose: object.prose.trim(),
