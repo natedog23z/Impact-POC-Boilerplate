@@ -2,7 +2,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
-import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt, logComposeRequest, logComposeSuccess, logComposeError } from './shared';
+import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt, logComposeRequest, logComposeSuccess, logComposeError, extractFirstJsonObject } from './shared';
 import { KEY_AREAS_CHALLENGES_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
@@ -38,22 +38,63 @@ export async function composeKeyAreasChallenges(
     : payload;
   logComposeRequest('keyAreasChallenges', modelName, systemMsg, userMsg, options.prompts);
 
-  const { object } = await limiter(() =>
-    generateObject({
-      model: composeOpenAI(modelName),
-      schema: responseSchema,
-      temperature: 0.35,
-      messages: [
-        { role: 'system', content: systemMsg },
-        { role: 'user', content: userMsg },
-      ],
-    }),
-  );
-
-  logComposeSuccess('keyAreasChallenges', object);
+  let object;
+  try {
+    ({ object } = await limiter(() =>
+      generateObject({
+        model: composeOpenAI(modelName),
+        schema: responseSchema,
+        temperature: 0.35,
+        messages: [
+          { role: 'system', content: systemMsg },
+          { role: 'user', content: userMsg },
+        ],
+      }),
+    ));
+    logComposeSuccess('keyAreasChallenges', object);
+  } catch (err: any) {
+    // Attempt recovery if only prose length overflowed or JSON duplication occurred
+    logComposeError('keyAreasChallenges', err);
+    const raw = err?.text as string | undefined;
+    const recovered = raw ? extractFirstJsonObject(raw) : null;
+    if (recovered && typeof recovered === 'object' && recovered !== null) {
+      const candidate: any = recovered;
+      // Coerce fields and truncate prose to constraints
+      const truncate = (s: unknown, max: number) =>
+        typeof s === 'string' ? s.slice(0, max) : '';
+      const coerceItems = (arr: any): Array<{ title: string; description: string }> => {
+        if (!Array.isArray(arr)) return [];
+        return arr
+          .filter((it) => it && typeof it === 'object')
+          .map((it) => ({
+            title: String((it as any).title || '').slice(0, 80),
+            description: String((it as any).description || '').slice(0, 220),
+          }))
+          .slice(0, 6);
+      };
+      object = {
+        proseLeft: truncate(candidate.proseLeft, 400) || 'Highlights from assessed outcomes and participant strengths.',
+        proseRight: truncate(candidate.proseRight, 400) || 'Common challenges the program helps participants navigate.',
+        impacts: coerceItems(candidate.impacts),
+        challenges: coerceItems(candidate.challenges),
+      };
+    } else {
+      // Deterministic minimal fallback derived from cohort facts
+      const left = 'Highlights from assessed outcomes and participant strengths.';
+      const right = 'Common challenges the program helps participants navigate.';
+      const toItems = (tags: Array<{ tag: string; count: number }>) =>
+        tags.slice(0, 4).map((t) => ({ title: t.tag, description: 'Notable frequency in cohort data.' }));
+      object = {
+        proseLeft: left,
+        proseRight: right,
+        impacts: toItems(cohort.topStrengths),
+        challenges: toItems(cohort.topChallenges),
+      };
+    }
+  }
 
   return {
-    prose: `${object.proseLeft.trim()}\n\n${object.proseRight.trim()}`.trim(),
+    prose: `${String(object.proseLeft || '').trim()}\n\n${String(object.proseRight || '').trim()}`.trim(),
     component: {
       impacts: object.impacts,
       challenges: object.challenges,
