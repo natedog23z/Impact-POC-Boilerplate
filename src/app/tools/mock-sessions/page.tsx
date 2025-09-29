@@ -28,6 +28,7 @@ import ParticipantReasonsCard from '@/components/dashboard/ParticipantReasonsCar
 import KeyAreasChallengesCard from '@/components/dashboard/KeyAreasChallengesCard';
 import KeyThemesCard from '@/components/dashboard/KeyThemesCard';
 import FlourishingOutcomesGrid from '@/components/dashboard/FlourishingOutcomesGrid';
+import TestimonialsCard from '@/components/dashboard/TestimonialsCard';
 import { SURVEY_KEY_MAP } from '@/lib/mock-sessions/surveyKeys';
 import {
   OVERALL_IMPACT_SYSTEM_PROMPT,
@@ -588,6 +589,14 @@ export default function MockSessionsPage() {
             />
           </Box>
         </Flex>
+        </Box>
+        {/* Testimonials section */}
+        <Box style={{ marginTop: 12 }}>
+          <TestimonialsCard
+            title="Testimonials"
+            quotes={data.cohortFacts.exemplarQuotes}
+            sourceNote="Sourced from participant reflections & outcome notes"
+          />
         </Box>
         {/* Key Areas of Impact & Primary Challenges Addressed */}
         <Box style={{ marginTop: 12 }}>
