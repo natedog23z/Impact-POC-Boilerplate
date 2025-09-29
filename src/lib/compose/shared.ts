@@ -12,10 +12,24 @@ export const composeOpenAI = createOpenAI({
 
 export const defaultComposeLimiter = pLimit(4);
 
+export type PromptOverrides = {
+  system?: string;
+  // Replaces the entire user message content if provided
+  user?: string;
+  // If provided (and user is not), appended after the default user instructions
+  userInstructions?: string;
+};
+
 export type ComposeOptions = {
   limiter?: LimitFunction;
   model?: string;
+  prompts?: PromptOverrides;
 };
+
+export function guardSystemPrompt(systemPrompt: string, proseCharLimit: number = 800): string {
+  const guard = `\n\nHard limits (do not ignore):\n- Follow the JSON schema exactly.\n- Keep any prose fields <= ${proseCharLimit} characters.\n- Avoid markdown headings, lists, or styling; write plain sentences.`;
+  return `${systemPrompt}${guard}`;
+}
 
 // Best-effort recovery: extract the first complete JSON object from a string
 // Useful when models accidentally duplicate JSON outputs causing parse failures upstream

@@ -3,14 +3,15 @@ import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
 
-import { composeOpenAI, defaultComposeLimiter, type ComposeOptions } from './shared';
+import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt } from './shared';
+import { OVERALL_IMPACT_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
 const proseSchema = z.object({
   prose: z.string().min(1).max(800),
 });
 
-const SYSTEM_PROMPT = `You are summarizing overall program impact for donors in an executive dashboard. Use ONLY the supplied cohort facts. Lead with scale (participants/sessions) and verified completion %, then the top 1–2 outcomes (pre→post signals or habit formation). Include exactly one short beneficiary quote if available. Close with a single sentence on next-step focus. Keep it under 120 words, confident, concrete, and free of hype or jargon. Acknowledge any data-quality notes in one clause if present.`;
+// System prompt is now sourced from shared defaults and can be overridden via ComposeOptions
 
 export async function composeOverallImpact(
   cohort: CohortFacts,
@@ -21,20 +22,43 @@ export async function composeOverallImpact(
   const limiter = options.limiter ?? defaultComposeLimiter;
   const modelName = options.model ?? MODEL_NAME;
 
-  const { object } = await limiter(() =>
-    generateObject({
-      model: composeOpenAI(modelName),
-      schema: proseSchema,
-      temperature: 0.35,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: buildImpactPrompt(cohort, quotes),
-        },
-      ],
-    }),
-  );
+  let object;
+  try {
+    ({ object } = await limiter(() =>
+      generateObject({
+        model: composeOpenAI(modelName),
+        schema: proseSchema,
+        temperature: 0.35,
+        messages: [
+          { role: 'system', content: guardSystemPrompt(options.prompts?.system ?? OVERALL_IMPACT_SYSTEM_PROMPT, 800) },
+          {
+            role: 'user',
+            content: (() => {
+              const base = buildImpactPrompt(cohort, quotes);
+              if (options.prompts?.user) return options.prompts.user;
+              if (options.prompts?.userInstructions) return `${base}\n\nAdditional instructions:\n${options.prompts.userInstructions}`;
+              return base;
+            })(),
+          },
+        ],
+      }),
+    ));
+  } catch (err: any) {
+    // Best-effort fallback: try to salvage prose from text, then enforce length
+    const text: string | undefined = err?.text;
+    if (text) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed && typeof parsed.prose === 'string') {
+          const truncated = parsed.prose.slice(0, 800);
+          object = { prose: truncated };
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (!object) throw err;
+  }
 
   return {
     prose: object.prose.trim(),

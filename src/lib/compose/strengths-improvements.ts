@@ -2,7 +2,8 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
-import { composeOpenAI, defaultComposeLimiter, type ComposeOptions } from './shared';
+import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt } from './shared';
+import { STRENGTHS_IMPROVEMENTS_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
 
@@ -17,10 +18,7 @@ const responseSchema = z.object({
   improvements: z.array(itemSchema).min(1).max(6),
 });
 
-const SYSTEM_PROMPT = `You produce a balanced "Strengths and Areas for Improvement" section for an impact dashboard.
-Use only the provided cohort facts (counts, top tags, limited quotes). Turn the most frequent strength tags into clear titles with one-sentence plain-language descriptions that reflect the cohort.
-For improvements, convert the most frequent improvement and challenge tags into constructive, neutral recommendations (one sentence each). Avoid hype, clinical claims, or PII.
-Return concise items (≤ 6 each).`;
+// System prompt is now sourced from shared defaults and can be overridden via ComposeOptions
 
 export async function composeStrengthsImprovements(
   cohort: CohortFacts,
@@ -37,8 +35,15 @@ export async function composeStrengthsImprovements(
       schema: responseSchema,
       temperature: 0.35,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: payload },
+        { role: 'system', content: guardSystemPrompt(options.prompts?.system ?? STRENGTHS_IMPROVEMENTS_SYSTEM_PROMPT, 800) },
+        {
+          role: 'user',
+          content: options.prompts?.user
+            ? options.prompts.user
+            : options.prompts?.userInstructions
+            ? `${payload}\n\nAdditional instructions:\n${options.prompts.userInstructions}`
+            : payload,
+        },
       ],
     }),
   );

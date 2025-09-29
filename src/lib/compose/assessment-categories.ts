@@ -2,7 +2,8 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
-import { composeOpenAI, defaultComposeLimiter, type ComposeOptions } from './shared';
+import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt } from './shared';
+import { ASSESSMENT_CATEGORIES_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
 
@@ -18,12 +19,7 @@ const responseSchema = z.object({
   categories: z.array(categorySchema).min(3).max(8),
 });
 
-const SYSTEM_PROMPT = `Group quantitative survey assessments into concise outcome categories for an impact dashboard.
-- Use only the provided assessment keys, labels, and direction-of-improvement (betterWhen).
-- Create 4–6 human-friendly categories (e.g., "Meaning & Purpose", "Close Social Relationships", "Mental & Physical Health", "Financial & Material Stability").
-- For each category, return a short title and list of includedKeys referencing the original assessment keys. Avoid fabricating keys; prefer grouping and sensible naming.
-- Keep language neutral and professional. Avoid clinical claims or value judgments.
-Return JSON only per the provided schema.`;
+// System prompt is now sourced from shared defaults and can be overridden via ComposeOptions
 
 export type AssessmentCategory = z.infer<typeof categorySchema> & {
   percentImproved: number | null;
@@ -60,8 +56,15 @@ export async function composeAssessmentCategories(
       schema: responseSchema,
       temperature: 0.3,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: payload },
+        { role: 'system', content: guardSystemPrompt(options.prompts?.system ?? ASSESSMENT_CATEGORIES_SYSTEM_PROMPT, 800) },
+        {
+          role: 'user',
+          content: options.prompts?.user
+            ? options.prompts.user
+            : options.prompts?.userInstructions
+            ? `${payload}\n\nAdditional instructions:\n${options.prompts.userInstructions}`
+            : payload,
+        },
       ],
     }),
   );

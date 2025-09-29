@@ -29,6 +29,15 @@ import KeyAreasChallengesCard from '@/components/dashboard/KeyAreasChallengesCar
 import KeyThemesCard from '@/components/dashboard/KeyThemesCard';
 import FlourishingOutcomesGrid from '@/components/dashboard/FlourishingOutcomesGrid';
 import { SURVEY_KEY_MAP } from '@/lib/mock-sessions/surveyKeys';
+import {
+  OVERALL_IMPACT_SYSTEM_PROMPT,
+  KEY_THEMES_SYSTEM_PROMPT,
+  STRENGTHS_IMPROVEMENTS_SYSTEM_PROMPT,
+  KEY_AREAS_CHALLENGES_SYSTEM_PROMPT,
+  ASSESSMENT_OUTCOMES_SYSTEM_PROMPT,
+  ASSESSMENT_CATEGORIES_SYSTEM_PROMPT,
+  PARTICIPANT_REASONS_SYSTEM_PROMPT,
+} from '@/lib/compose/prompt-defaults';
 
 const DEFAULT_SENTIMENT_MIX = {
   positive: 0.4,
@@ -169,6 +178,27 @@ export default function MockSessionsPage() {
     | { status: 'completed'; result: RunPipelineInlineResponse }
     | { status: 'error'; message: string }
   >({ status: 'idle' });
+
+  type PromptText = { system: string; userInstructions: string };
+  type PromptOverridesBySectionUI = {
+    assessmentOutcomes: PromptText;
+    assessmentCategories: PromptText;
+    overallImpact: PromptText;
+    strengthsImprovements: PromptText;
+    participantReasons: PromptText;
+    keyAreasChallenges: PromptText;
+    keyThemes: PromptText;
+  };
+
+  const [prompts, setPrompts] = useState<PromptOverridesBySectionUI>({
+    assessmentOutcomes: { system: ASSESSMENT_OUTCOMES_SYSTEM_PROMPT, userInstructions: '' },
+    assessmentCategories: { system: ASSESSMENT_CATEGORIES_SYSTEM_PROMPT, userInstructions: '' },
+    overallImpact: { system: OVERALL_IMPACT_SYSTEM_PROMPT, userInstructions: '' },
+    strengthsImprovements: { system: STRENGTHS_IMPROVEMENTS_SYSTEM_PROMPT, userInstructions: '' },
+    participantReasons: { system: PARTICIPANT_REASONS_SYSTEM_PROMPT, userInstructions: '' },
+    keyAreasChallenges: { system: KEY_AREAS_CHALLENGES_SYSTEM_PROMPT, userInstructions: '' },
+    keyThemes: { system: KEY_THEMES_SYSTEM_PROMPT, userInstructions: '' },
+  });
 
   const mixDisplay = useMemo(() => mixToDisplay(sentimentMix), [sentimentMix]);
 
@@ -418,7 +448,8 @@ export default function MockSessionsPage() {
     }
     try {
       setPipeline({ status: 'running' });
-      const result = await runImpactPipelineInline(raws);
+      const overrides = buildPromptOverridesForAction(prompts);
+      const result = await runImpactPipelineInline(raws, overrides);
       setPipeline({ status: 'completed', result });
     } catch (err) {
       setPipeline({ status: 'error', message: err instanceof Error ? err.message : 'Pipeline failed.' });
@@ -430,7 +461,7 @@ export default function MockSessionsPage() {
     return (
       <Card variant="classic" style={{ marginTop: 24 }}>
         <Flex justify="between" align="center">
-          <Heading size="3">2. Generate mock dashboards</Heading>
+          <Heading size="3">3. Generate mock dashboards</Heading>
           <Button onClick={handleRunPipelineInline} disabled={pipeline.status === 'running'}>
             {pipeline.status === 'running' ? 'Running…' : 'Run pipeline on generated sessions'}
           </Button>
@@ -441,6 +472,92 @@ export default function MockSessionsPage() {
           </Text>
         )}
         {pipeline.status === 'completed' && renderPipelineResults(pipeline.result)}
+      </Card>
+    );
+  };
+
+  const updatePromptField = (
+    section: keyof PromptOverridesBySectionUI,
+    field: keyof PromptText,
+    value: string,
+  ) => {
+    setPrompts((prev) => ({
+      ...prev,
+      [section]: { ...prev[section], [field]: value },
+    }));
+  };
+
+  const buildPromptOverridesForAction = (p: PromptOverridesBySectionUI) => {
+    return {
+      assessmentOutcomes: { system: p.assessmentOutcomes.system, userInstructions: p.assessmentOutcomes.userInstructions },
+      assessmentCategories: { system: p.assessmentCategories.system, userInstructions: p.assessmentCategories.userInstructions },
+      overallImpact: { system: p.overallImpact.system, userInstructions: p.overallImpact.userInstructions },
+      strengthsImprovements: { system: p.strengthsImprovements.system, userInstructions: p.strengthsImprovements.userInstructions },
+      participantReasons: { system: p.participantReasons.system, userInstructions: p.participantReasons.userInstructions },
+      keyAreasChallenges: { system: p.keyAreasChallenges.system, userInstructions: p.keyAreasChallenges.userInstructions },
+      keyThemes: { system: p.keyThemes.system, userInstructions: p.keyThemes.userInstructions },
+    } as const;
+  };
+
+  const renderPromptsSection = () => {
+    if (state.status !== 'completed') return null;
+    return (
+      <Card variant="classic" style={{ marginTop: 24 }}>
+        <Heading size="3">2. Configure prompts (optional)</Heading>
+        <Text size="2" color="gray" style={{ marginTop: 8 }}>
+          Edit system prompts or add extra instructions for each dashboard section. These overrides will be used for the next pipeline run.
+        </Text>
+        <Flex direction="column" gap="3" style={{ marginTop: 12 }}>
+          <details>
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Overall Impact</summary>
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>System prompt</Text>
+            <TextArea size="3" value={prompts.overallImpact.system} onChange={(e) => updatePromptField('overallImpact', 'system', e.target.value)} />
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>Additional instructions</Text>
+            <TextArea size="3" value={prompts.overallImpact.userInstructions} onChange={(e) => updatePromptField('overallImpact', 'userInstructions', e.target.value)} />
+          </details>
+          <details>
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Key Themes</summary>
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>System prompt</Text>
+            <TextArea size="3" value={prompts.keyThemes.system} onChange={(e) => updatePromptField('keyThemes', 'system', e.target.value)} />
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>Additional instructions</Text>
+            <TextArea size="3" value={prompts.keyThemes.userInstructions} onChange={(e) => updatePromptField('keyThemes', 'userInstructions', e.target.value)} />
+          </details>
+          <details>
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Strengths & Improvements</summary>
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>System prompt</Text>
+            <TextArea size="3" value={prompts.strengthsImprovements.system} onChange={(e) => updatePromptField('strengthsImprovements', 'system', e.target.value)} />
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>Additional instructions</Text>
+            <TextArea size="3" value={prompts.strengthsImprovements.userInstructions} onChange={(e) => updatePromptField('strengthsImprovements', 'userInstructions', e.target.value)} />
+          </details>
+          <details>
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Key Areas & Challenges</summary>
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>System prompt</Text>
+            <TextArea size="3" value={prompts.keyAreasChallenges.system} onChange={(e) => updatePromptField('keyAreasChallenges', 'system', e.target.value)} />
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>Additional instructions</Text>
+            <TextArea size="3" value={prompts.keyAreasChallenges.userInstructions} onChange={(e) => updatePromptField('keyAreasChallenges', 'userInstructions', e.target.value)} />
+          </details>
+          <details>
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Participant Reasons</summary>
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>System prompt</Text>
+            <TextArea size="3" value={prompts.participantReasons.system} onChange={(e) => updatePromptField('participantReasons', 'system', e.target.value)} />
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>Additional instructions</Text>
+            <TextArea size="3" value={prompts.participantReasons.userInstructions} onChange={(e) => updatePromptField('participantReasons', 'userInstructions', e.target.value)} />
+          </details>
+          <details>
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Assessment Outcomes</summary>
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>System prompt</Text>
+            <TextArea size="3" value={prompts.assessmentOutcomes.system} onChange={(e) => updatePromptField('assessmentOutcomes', 'system', e.target.value)} />
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>Additional instructions</Text>
+            <TextArea size="3" value={prompts.assessmentOutcomes.userInstructions} onChange={(e) => updatePromptField('assessmentOutcomes', 'userInstructions', e.target.value)} />
+          </details>
+          <details>
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Assessment Categories</summary>
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>System prompt</Text>
+            <TextArea size="3" value={prompts.assessmentCategories.system} onChange={(e) => updatePromptField('assessmentCategories', 'system', e.target.value)} />
+            <Text size="2" weight="bold" style={{ marginTop: 8 }}>Additional instructions</Text>
+            <TextArea size="3" value={prompts.assessmentCategories.userInstructions} onChange={(e) => updatePromptField('assessmentCategories', 'userInstructions', e.target.value)} />
+          </details>
+        </Flex>
       </Card>
     );
   };
@@ -539,7 +656,8 @@ export default function MockSessionsPage() {
     return undefined;
   };
 
-  // Inline improvement breakdown matching /reports
+  // Inline improvement breakdown (participant-level). A participant counts as
+  // improved only if a MAJORITY of their paired assessments improved.
   const getImprovementSummaryInline = (data: RunPipelineInlineResponse) => {
     const sessions = data.sessionFacts;
     const SIGNIFICANT_THRESHOLD = 2; // ≥2 points
@@ -556,18 +674,23 @@ export default function MockSessionsPage() {
       total += 1;
 
       let maxImprovement = 0;
+      let improvedCount = 0;
+      let pairedCount = 0;
       for (const d of paired) {
         const change = d.change ?? (d.pre !== null && d.post !== null ? d.post - d.pre : null);
         if (change === null) continue;
         const dir = (SURVEY_KEY_MAP as any)[d.key]?.betterWhen as 'higher' | 'lower' | undefined;
         const magnitude = dir === 'lower' ? -change : change;
-        if (Number.isFinite(magnitude)) {
-          if (magnitude > maxImprovement) maxImprovement = magnitude;
-        }
+        if (!Number.isFinite(magnitude)) continue;
+        pairedCount += 1;
+        if (magnitude > 0) improvedCount += 1;
+        if (magnitude > maxImprovement) maxImprovement = magnitude;
       }
 
-      if (maxImprovement >= SIGNIFICANT_THRESHOLD) significant += 1;
-      else if (maxImprovement > 0) some += 1;
+      // Majority rule for improvement
+      const majorityImproved = improvedCount >= Math.ceil(pairedCount / 2);
+      if (majorityImproved && maxImprovement >= SIGNIFICANT_THRESHOLD) significant += 1;
+      else if (majorityImproved) some += 1;
       else none += 1;
     }
 
@@ -762,6 +885,7 @@ export default function MockSessionsPage() {
       </Card>
 
       {renderStatus()}
+      {renderPromptsSection()}
       {renderResults()}
     </Box>
   );

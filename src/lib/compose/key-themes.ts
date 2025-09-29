@@ -2,7 +2,8 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
-import { composeOpenAI, defaultComposeLimiter, extractFirstJsonObject, type ComposeOptions } from './shared';
+import { composeOpenAI, defaultComposeLimiter, extractFirstJsonObject, type ComposeOptions, guardSystemPrompt } from './shared';
+import { KEY_THEMES_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
 
@@ -17,13 +18,7 @@ const responseSchema = z.object({
   themes: z.array(themeItemSchema).min(3).max(6),
 });
 
-const SYSTEM_PROMPT = `You create a "Key Themes" section for an impact dashboard.
-Use only the provided cohort facts: topThemes (tags with counts), exemplar quotes (optional), completion, and data-quality notes.
-Tasks:
-- Convert the most frequent theme tags into concise, human-friendly titles.
-- Write a one-sentence description for each title that reflects what participants are saying, grounded in tags and quotes.
-- Include percentMentioned for each item computed from provided counts and cohort size (already provided in the prompt data when available).
-Constraints: 3–6 items, neutral tone, no hype, no diagnoses or PII. Keep prose under 120 words.`;
+// System prompt is now sourced from shared defaults and can be overridden via ComposeOptions
 
 export async function composeKeyThemes(
   cohort: CohortFacts,
@@ -57,8 +52,15 @@ export async function composeKeyThemes(
         schema: responseSchema,
         temperature: 0.35,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: payload },
+          { role: 'system', content: guardSystemPrompt(options.prompts?.system ?? KEY_THEMES_SYSTEM_PROMPT, 800) },
+          {
+            role: 'user',
+            content: options.prompts?.user
+              ? options.prompts.user
+              : options.prompts?.userInstructions
+              ? `${payload}\n\nAdditional instructions:\n${options.prompts.userInstructions}`
+              : payload,
+          },
         ],
       }),
     ));

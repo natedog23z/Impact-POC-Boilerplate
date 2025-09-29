@@ -45,7 +45,20 @@ export type RunPipelineInlineResponse = {
   meta: PipelineMeta;
 };
 
-export async function runImpactPipelineInline(rawSessions: RawSession[]): Promise<RunPipelineInlineResponse> {
+export type PromptOverridesBySection = {
+  assessmentOutcomes?: { system?: string; user?: string; userInstructions?: string };
+  assessmentCategories?: { system?: string; user?: string; userInstructions?: string };
+  overallImpact?: { system?: string; user?: string; userInstructions?: string };
+  strengthsImprovements?: { system?: string; user?: string; userInstructions?: string };
+  participantReasons?: { system?: string; user?: string; userInstructions?: string };
+  keyAreasChallenges?: { system?: string; user?: string; userInstructions?: string };
+  keyThemes?: { system?: string; user?: string; userInstructions?: string };
+};
+
+export async function runImpactPipelineInline(
+  rawSessions: RawSession[],
+  promptOverrides?: PromptOverridesBySection,
+): Promise<RunPipelineInlineResponse> {
   if (!Array.isArray(rawSessions) || rawSessions.length === 0) {
     throw new Error('No RawSession objects were provided.');
   }
@@ -86,13 +99,13 @@ export async function runImpactPipelineInline(rawSessions: RawSession[]): Promis
   const cohortFacts = buildCohortFacts(sessionFacts);
 
   const [assessmentOutcomes, assessmentCategories, overallImpact, strengthsImprovements, participantReasons, keyAreasChallenges, keyThemes] = await Promise.all([
-    composeAssessmentOutcomes(cohortFacts, { limiter }),
-    composeAssessmentCategories(cohortFacts, { limiter }),
-    composeOverallImpact(cohortFacts, { limiter }),
-    composeStrengthsImprovements(cohortFacts, { limiter }),
-    composeParticipantReasons(cohortFacts, { limiter }),
-    composeKeyAreasChallenges(cohortFacts, { limiter }),
-    composeKeyThemes(cohortFacts, { limiter }),
+    composeAssessmentOutcomes(cohortFacts, { limiter, prompts: promptOverrides?.assessmentOutcomes }),
+    composeAssessmentCategories(cohortFacts, { limiter, prompts: promptOverrides?.assessmentCategories }),
+    composeOverallImpact(cohortFacts, { limiter, prompts: promptOverrides?.overallImpact }),
+    composeStrengthsImprovements(cohortFacts, { limiter, prompts: promptOverrides?.strengthsImprovements }),
+    composeParticipantReasons(cohortFacts, { limiter, prompts: promptOverrides?.participantReasons }),
+    composeKeyAreasChallenges(cohortFacts, { limiter, prompts: promptOverrides?.keyAreasChallenges }),
+    composeKeyThemes(cohortFacts, { limiter, prompts: promptOverrides?.keyThemes }),
   ]);
 
   return {

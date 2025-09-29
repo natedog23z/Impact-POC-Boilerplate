@@ -2,7 +2,8 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
-import { composeOpenAI, defaultComposeLimiter, type ComposeOptions } from './shared';
+import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt } from './shared';
+import { PARTICIPANT_REASONS_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
 
@@ -17,9 +18,7 @@ const responseSchema = z.object({
   reasons: z.array(reasonItemSchema).min(1).max(6),
 });
 
-const SYSTEM_PROMPT = `You summarize why participants are seeking the program, for an executive dashboard.
-Use only provided counts of top reasons from applications. Convert the highest-frequency reason tags into clear titles with one-sentence descriptions.
-Include a percent for each reason computed from provided counts and cohort size. Avoid hype, diagnoses, or PII. Keep concise.`;
+// System prompt is now sourced from shared defaults and can be overridden via ComposeOptions
 
 export async function composeParticipantReasons(
   cohort: CohortFacts,
@@ -50,8 +49,15 @@ export async function composeParticipantReasons(
       schema: responseSchema,
       temperature: 0.3,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: payload },
+        { role: 'system', content: guardSystemPrompt(options.prompts?.system ?? PARTICIPANT_REASONS_SYSTEM_PROMPT, 800) },
+        {
+          role: 'user',
+          content: options.prompts?.user
+            ? options.prompts.user
+            : options.prompts?.userInstructions
+            ? `${payload}\n\nAdditional instructions:\n${options.prompts.userInstructions}`
+            : payload,
+        },
       ],
     }),
   );

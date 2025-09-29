@@ -3,14 +3,15 @@ import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
 
-import { composeOpenAI, defaultComposeLimiter, extractFirstJsonObject, type ComposeOptions } from './shared';
+import { composeOpenAI, defaultComposeLimiter, extractFirstJsonObject, type ComposeOptions, guardSystemPrompt } from './shared';
+import { ASSESSMENT_OUTCOMES_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
 const proseSchema = z.object({
   prose: z.string().min(1).max(800),
 });
 
-const SYSTEM_PROMPT = `You are composing a concise "Assessment Outcomes" summary for an impact dashboard. Use only the provided cohort metrics. Highlight key trends in average change and percent improved. Call out data sparsity when necessary. Keep prose under 120 words, professional, and factual.`;
+// System prompt is now sourced from shared defaults and can be overridden via ComposeOptions
 
 export async function composeAssessmentOutcomes(
   cohort: CohortFacts,
@@ -46,10 +47,15 @@ export async function composeAssessmentOutcomes(
         schema: proseSchema,
         temperature: 0.3,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: guardSystemPrompt(options.prompts?.system ?? ASSESSMENT_OUTCOMES_SYSTEM_PROMPT, 800) },
           {
             role: 'user',
-            content: buildAssessmentPrompt(cohort),
+            content: (() => {
+              const base = buildAssessmentPrompt(cohort);
+              if (options.prompts?.user) return options.prompts.user;
+              if (options.prompts?.userInstructions) return `${base}\n\nAdditional instructions:\n${options.prompts.userInstructions}`;
+              return base;
+            })(),
           },
         ],
       }),

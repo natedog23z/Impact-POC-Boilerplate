@@ -2,7 +2,8 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 import type { CohortFacts, SectionOutput } from '@/types/schemas';
-import { composeOpenAI, defaultComposeLimiter, type ComposeOptions } from './shared';
+import { composeOpenAI, defaultComposeLimiter, type ComposeOptions, guardSystemPrompt } from './shared';
+import { KEY_AREAS_CHALLENGES_SYSTEM_PROMPT } from './prompt-defaults';
 
 const MODEL_NAME = 'gpt-4o-mini';
 
@@ -18,12 +19,7 @@ const responseSchema = z.object({
   challenges: z.array(listItemSchema).min(1).max(6),
 });
 
-const SYSTEM_PROMPT = `You create a two-column dashboard section titled "Key Areas of Impact" and "Primary Challenges Addressed".
-Use only the provided cohort facts: assessment deltas and % improved, top strengths/improvements/themes/challenges, reasons, completion, and exemplar quotes.
-Synthesize:
-- Key Areas of Impact: derive from the strongest positive assessment signals and frequent strengths/themes; write plain, non-technical benefits.
-- Primary Challenges Addressed: derive from frequent challenges and improvement tags plus intake reasons; phrase as what the program helps with.
-Keep items concise, neutral, and program-agnostic. Avoid hype, diagnoses, or PII. Limit to ≤ 6 items per column with single-sentence descriptions. Provide short prose intros for each column.`;
+// System prompt is now sourced from shared defaults and can be overridden via ComposeOptions
 
 export async function composeKeyAreasChallenges(
   cohort: CohortFacts,
@@ -40,8 +36,15 @@ export async function composeKeyAreasChallenges(
       schema: responseSchema,
       temperature: 0.35,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: payload },
+        { role: 'system', content: guardSystemPrompt(options.prompts?.system ?? KEY_AREAS_CHALLENGES_SYSTEM_PROMPT, 800) },
+        {
+          role: 'user',
+          content: options.prompts?.user
+            ? options.prompts.user
+            : options.prompts?.userInstructions
+            ? `${payload}\n\nAdditional instructions:\n${options.prompts.userInstructions}`
+            : payload,
+        },
       ],
     }),
   );
