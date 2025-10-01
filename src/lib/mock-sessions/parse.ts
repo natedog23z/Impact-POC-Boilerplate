@@ -282,6 +282,11 @@ const parseOutcomeNoteMilestone = (
   const noteLines: string[] = [];
   const planItems: string[] = [];
 
+  // Track if we saw explicit Therapist Notes header
+  let sawTherapistNotes = false;
+  // Track if we are inside a Recommendations section
+  let inRecommendations = false;
+
   while (idx < lines.length) {
     const rawLine = lines[idx];
     const line = rawLine.trim();
@@ -307,40 +312,50 @@ const parseOutcomeNoteMilestone = (
       idx++;
       continue;
     }
-    if (line.startsWith('Therapist Notes')) {
+    if (/^Therapist Notes/i.test(line)) {
       collectingNotes = true;
+      sawTherapistNotes = true;
+      inRecommendations = false;
       idx++;
       continue;
     }
-    if (line.startsWith('Plan')) {
+    if (/^Recommendations\s*$/i.test(line)) {
+      // Switch to plan collection; stop generic notes accumulation
       collectingNotes = false;
+      inRecommendations = true;
       idx++;
-      while (idx < lines.length) {
-        const planLine = lines[idx].trim();
-        if (!planLine) {
-          idx++;
-          continue;
-        }
-        if (planLine.startsWith('-')) {
-          planItems.push(planLine.replace(/^-+\s*/, '').trim());
-          idx++;
-          continue;
-        }
-        // plain text plan line
-        planItems.push(planLine);
-        idx++;
-      }
-      break;
+      continue;
+    }
+    if (/^Plan\s*:?.*$/i.test(line)) {
+      collectingNotes = false;
+      inRecommendations = true;
+      idx++;
+      continue;
     }
 
-    if (collectingNotes) {
+    if (inRecommendations) {
+      // Collect bullet or plain lines as plan items
+      const planLine = line;
+      if (planLine.startsWith('-')) {
+        planItems.push(planLine.replace(/^-+\s*/, '').trim());
+      } else {
+        planItems.push(planLine);
+      }
+      idx++;
+      continue;
+    }
+
+    if (collectingNotes || !sawTherapistNotes) {
+      // If no explicit Therapist Notes header, treat free-form sections as notes
       noteLines.push(rawLine.trimEnd());
+      idx++;
+      continue;
     }
 
     idx++;
   }
 
-  outcome.notes = noteLines.join('\n').trim() || undefined;
+  outcome.notes = (noteLines.join('\n').trim() || undefined);
   outcome.plan = planItems.length ? planItems : undefined;
 
   return {
