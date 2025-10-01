@@ -14,8 +14,8 @@ const itemSchema = z.object({
 
 const responseSchema = z.object({
   prose: z.string().min(1).max(800),
-  strengths: z.array(itemSchema).min(1).max(6),
-  improvements: z.array(itemSchema).min(1).max(6),
+  strengths: z.array(itemSchema).max(6).optional().default([]),
+  improvements: z.array(itemSchema).max(6).optional().default([]),
 });
 
 // System prompt is now sourced from shared defaults and can be overridden via ComposeOptions

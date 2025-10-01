@@ -62,8 +62,8 @@ export async function buildSessionFacts(
     strengths: extraction.strengths.slice(0, 6),
     improvements: extraction.improvements.slice(0, 6),
     themes: extraction.themes.slice(0, 6),
-    reasons: dedupeStrings(raw.application?.reasons ?? []),
-    challenges: dedupeStrings(raw.application?.challenges ?? []),
+    reasons: dedupeStrings(raw.application?.reasons ?? []).slice(0, 10),
+    challenges: dedupeStrings(raw.application?.challenges ?? []).slice(0, 10),
     quotes: extraction.quotes.slice(0, 2).map((quote) => ({
       sessionId: quote.sessionId,
       text: quote.text,

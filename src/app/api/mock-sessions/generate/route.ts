@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 
-import { parseMockSession, extractProgramHeaderBlock, extractMilestoneOutline } from '@/lib/mock-sessions/parse';
+import { parseMockSession, extractProgramHeaderBlock, extractMilestoneOutline, extractVersionDetailsRecord } from '@/lib/mock-sessions/parse';
 import type {
   RawSession,
   GenerationLogEntry,
@@ -16,9 +16,6 @@ import {
   PARTICIPANT_FIRST_NAMES,
   PARTICIPANT_LAST_NAMES,
   ZIP_CODES,
-  PROGRAM_REASONS,
-  PROGRAM_CHALLENGES,
-  REFLECTION_SEED_PHRASES,
   CHURCH_ATTENDANCE_CHOICES,
   BIRTH_YEAR_BUCKETS,
   GENDER_CHOICES,
@@ -119,6 +116,12 @@ type ScenarioPlan = {
   reflectionHint: string;
 };
 
+type ExampleSignals = {
+  reasons: string[];
+  challenges: string[];
+  reflectionHints: string[];
+};
+
 class BadRequestError extends Error {
   public status = 400;
 }
@@ -133,6 +136,8 @@ export async function POST(req: Request) {
     const surveyTemplate = collectSurveyTemplate(baseParse);
     const lockedHeaderBlock = extractProgramHeaderBlock(trimmedExample);
     const milestoneOutline = extractMilestoneOutline(trimmedExample);
+    const versionDetails = extractVersionDetailsRecord(trimmedExample);
+    const exampleHandoff = buildExampleSignalHandoff(trimmedExample);
 
     const schedule = createSentimentSchedule(payload.count, payload.mix, payload.seedValue);
 
@@ -146,6 +151,7 @@ export async function POST(req: Request) {
         sentiment,
         idx,
         payload,
+        exampleSignals: exampleHandoff,
       }),
     );
 
@@ -381,9 +387,13 @@ function randomId(rng: () => number, length: number = 26): string {
   return output;
 }
 
-function buildScenarioPlan(rng: () => number): ScenarioPlan {
+function buildScenarioPlan(rng: () => number, example: { reasons: string[]; challenges: string[]; reflectionHints: string[] }): ScenarioPlan {
   const participantFirst = pick(rng, PARTICIPANT_FIRST_NAMES);
   const participantLast = pick(rng, PARTICIPANT_LAST_NAMES);
+
+  const reasonsPool = example.reasons.length ? example.reasons : [''];
+  const challengesPool = example.challenges.length ? example.challenges : [''];
+  const reflectionPool = example.reflectionHints.length ? example.reflectionHints : [''];
 
   return {
     participant: {
@@ -393,10 +403,22 @@ function buildScenarioPlan(rng: () => number): ScenarioPlan {
       zipCode: pick(rng, ZIP_CODES),
       ethnicity: pick(rng, ETHNICITY_CHOICES),
     },
-    programReasons: pickMany(rng, PROGRAM_REASONS, 2 + Math.floor(rng() * 2)),
-    programChallenges: pickMany(rng, PROGRAM_CHALLENGES, 2 + Math.floor(rng() * 2)),
-    reflectionHint: pick(rng, REFLECTION_SEED_PHRASES),
+    programReasons: dedupeNonEmpty(pickMany(rng, reasonsPool, Math.min(3, reasonsPool.length || 1))),
+    programChallenges: dedupeNonEmpty(pickMany(rng, challengesPool, Math.min(3, challengesPool.length || 1))),
+    reflectionHint: pick(rng, reflectionPool) || '',
   };
+}
+
+function dedupeNonEmpty(items: readonly string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const s of items) {
+    const t = (s || '').trim();
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
 }
 
 function createOmissionPlan(options: {
@@ -519,7 +541,7 @@ function buildUserPrompt(options: {
     .map((m, i) => `  ${String(i + 1).padStart(2, '0')}. [${m.type}] ${m.title ?? '(untitled)'}${m.description ? ` — ${m.description}` : ''}`)
     .join('\n');
 
-  return `---BEGIN EXAMPLE---\n${exampleText}\n---END EXAMPLE---\n\nGenerate ONE new mock session document that mirrors the exact structure, headings, bullet styles, dividers, and ordering of the example. Use fresh story content that matches the guidance below. ${strictAddendum}\n\nLOCKED PROGRAM HEADER (copy exactly, but set the Version id in the heading to the Session ID below):\n${lockedHeaderBlock}\n\nContext:\n- Seed: ${seedUsed}\n- Session ID to use as the Version id in the heading: ${sessionId}\n- Sentiment target: ${sentiment}\n- Participant name: ${scenario.participant.name}\n- Participant gender: ${scenario.participant.gender}\n- Participant birth year bucket: ${scenario.participant.birthYearBucket}\n- Participant ZIP code: ${scenario.participant.zipCode}\n- Participant ethnicity: ${scenario.participant.ethnicity}\n- Program motivations to weave in: ${scenario.programReasons.join('; ')}\n- Program challenges to mention: ${scenario.programChallenges.join('; ')}\n- Reflection tone hint: ${scenario.reflectionHint}\n\nMilestone skeleton (keep these titles, types, order, and descriptions exactly; only vary the milestone responses/answers/notes):\n${lockedMilestonesText}\n\nSentiment guidance: ${buildSentimentGuidance(sentiment)}\n\nSurvey keys (keep labels identical, values must be integers 1-10):\n${buildSurveyKeyInstructions(surveyTemplate)}\n\n${formatOmissionPlan(omissionPlan)}\n\nCanonical JSON footer schema (no alternates):\n- For Applicant Survey milestones: use an "answers" object mapping survey keys to integers (1-10) or null for omissions. Do not include "qa" or "survey" arrays.\n- For Meeting milestones: include a "meeting" object with optional fields { with, details, schedulingLink }. Do not place these at the root.\n- For Reflection milestones: include a "reflection" object with { text }.\n- For Outcome Reporting milestones: include a "markdownOutcome" object that mirrors the example’s section content. Include notes (free-form text) and plan[] when present (e.g., items under Recommendations). Do not invent Date/Focus unless present in the example.\n- Never include duplicate or second timelines; produce one single 3-week window mirroring the example.\n- Never output empty strings for survey omissions; use null instead.\n\nAdditional rules:\n- Use ISO timestamps within the last 60 days and keep chronological order.\n- Maintain all milestone headings and the given titles verbatim.\n- Never duplicate names or locations from the example.\n- Keep at least two survey items with answers in BOTH pre and post sections.\n- When omitting content, leave the label but no text after the colon or bullet.\n- Reflection paragraph must be under 120 words even when brief.\n- Append a fenced \`json\` block representing the RawSession; it must include rawSchemaVersion 'v1', generatorVersion '${GENERATOR_VERSION}', seed '${seedUsed}', sessionId '${sessionId}', and sentiment '${sentiment}'.\n- JSON must contain milestones mirroring the document (Applicant Survey, Meeting, Outcome Note with markdownOutcome, Reflection, Post-Survey, Final Report or equivalent).\n- Do not add commentary before or after the document.`;
+  return `---BEGIN EXAMPLE---\n${exampleText}\n---END EXAMPLE---\n\nGenerate ONE new mock session document that mirrors the exact structure, headings, bullet styles, dividers, and ordering of the example. Use fresh story content that matches the guidance below. ${strictAddendum}\n\nLOCKED PROGRAM HEADER (copy exactly, but set the Version id in the heading to the Session ID below):\n${lockedHeaderBlock}\n\nContext:\n- Seed: ${seedUsed}\n- Session ID to use as the Version id in the heading: ${sessionId}\n- Sentiment target: ${sentiment}\n- Participant name: ${scenario.participant.name}\n- Participant gender: ${scenario.participant.gender}\n- Participant birth year bucket: ${scenario.participant.birthYearBucket}\n- Participant ZIP code: ${scenario.participant.zipCode}\n- Participant ethnicity: ${scenario.participant.ethnicity}\n- Program motivations to weave in: ${scenario.programReasons.join('; ')}\n- Program challenges to mention: ${scenario.programChallenges.join('; ')}\n- Reflection tone hint: ${scenario.reflectionHint}\n\nMilestone skeleton (keep these titles, types, order, and descriptions exactly; only vary the milestone responses/answers/notes):\n${lockedMilestonesText}\n\nSentiment guidance: ${buildSentimentGuidance(sentiment)}\n\nSurvey keys (keep labels identical, values must be integers 1-10):\n${buildSurveyKeyInstructions(surveyTemplate)}\n\n${formatOmissionPlan(omissionPlan)}\n\nCanonical JSON footer schema (no alternates):\n- For Applicant Survey milestones: use an "answers" object mapping survey keys to integers (1-10) or null for omissions. Do not include "qa" or "survey" arrays.\n- For Meeting milestones: include a "meeting" object with optional fields { with, details, schedulingLink }. Do not place these at the root.\n- For Reflection milestones: include a "reflection" object with { text }.\n- For Outcome Reporting milestones: include a "markdownOutcome" object that mirrors the example’s section content. Include notes (free-form text) and plan[] when present (e.g., items under Recommendations). Do not invent Date/Focus unless present in the example.\n- For Online Activity milestones: include an "activity" object with { link }.\n- Never include duplicate or second timelines; produce one single 3-week window mirroring the example.\n- Never output empty strings for survey omissions; use null instead.\n\nAdditional rules:\n- Use ISO timestamps within the last 60 days and keep chronological order.\n- Maintain all milestone headings and the given titles verbatim.\n- Never duplicate names or locations from the example.\n- Keep at least two survey items with answers in BOTH pre and post sections.\n- When omitting content, leave the label but no text after the colon or bullet.\n- Reflection paragraph must be under 120 words even when brief.\n- Append a fenced \`json\` block representing the RawSession; it must include rawSchemaVersion 'v1', generatorVersion '${GENERATOR_VERSION}', seed '${seedUsed}', sessionId '${sessionId}', and sentiment '${sentiment}'.\n- JSON must contain milestones mirroring the document (Applicant Survey, Meeting, Outcome Note with markdownOutcome, Reflection, Post-Survey, Final Report or equivalent).\n- Do not add commentary before or after the document.`;
 }
 
 function canonicalizeRawSession(
@@ -630,6 +652,13 @@ function canonicalizeRawSession(
       return core;
     }
 
+    if (/^online activity$/i.test(o.type)) {
+      const bm = baseMatch('Online Activity', o.title) as any;
+      const link = bm?.activity?.link ?? bm?.activityLink ?? m.activity?.link ?? m.activityLink;
+      core.activity = { link };
+      return core;
+    }
+
     return core;
   });
 
@@ -696,9 +725,9 @@ function canonicalizeRawSession(
     sentiment: raw.sentiment,
     milestones: canonicalMilestones,
   };
-  // Inject demographics and application directly into footer (avoid parsing markdown for these)
-  canonical.demographics = buildDemographicsFromScenario(scenario, rng);
-  canonical.application = buildApplicationFromScenario(scenario);
+  // Prefer values parsed from the generated markdown; fall back to scenario scaffolds only if missing
+  canonical.demographics = (mdParsed as any)?.demographics ?? buildDemographicsFromScenario(scenario, rng);
+  canonical.application = (mdParsed as any)?.application ?? buildApplicationFromScenario(scenario);
   return canonical;
 }
 
@@ -723,8 +752,8 @@ function deriveBirthYear(bucket: string, rng: () => number): number | undefined 
 
 function buildApplicationFromScenario(scenario: ScenarioPlan): { reasons?: string[]; challenges?: string[] } {
   return {
-    reasons: scenario.programReasons?.slice(0, 3),
-    challenges: scenario.programChallenges?.slice(0, 3),
+    reasons: scenario.programReasons?.slice(0, 3).filter(Boolean),
+    challenges: scenario.programChallenges?.slice(0, 3).filter(Boolean),
   };
 }
 
@@ -764,6 +793,30 @@ function parseJsonFooter(jsonText: string | undefined): RawSession | undefined {
     console.warn('Failed to parse JSON footer', error);
     return undefined;
   }
+}
+
+function buildExampleSignalHandoff(exampleMarkdown: string): ExampleSignals {
+  // Try to derive Program Application Q/A to seed reasons/challenges
+  const parsed = parseMockSession(exampleMarkdown);
+  const reasons = Array.isArray(parsed.application?.reasons) ? parsed.application!.reasons : [];
+  const challenges = Array.isArray(parsed.application?.challenges) ? parsed.application!.challenges : [];
+
+  // Mine simple reflection hints from milestone reflections if any
+  const reflectionHints: string[] = [];
+  for (const m of parsed.milestones) {
+    const text = (m as any)?.reflection?.text ?? (m as any)?.text;
+    if (m.type === 'Reflection' && typeof text === 'string' && text.trim()) {
+      const snippet = text.trim();
+      // Keep it short and neutral as a hint
+      reflectionHints.push(snippet.length > 140 ? `${snippet.slice(0, 137)}...` : snippet);
+    }
+  }
+
+  return {
+    reasons,
+    challenges,
+    reflectionHints,
+  };
 }
 
 function validateRawSession(raw: RawSession) {
@@ -826,14 +879,15 @@ async function generateSession(options: {
   sentiment: Sentiment;
   idx: number;
   payload: ValidatedPayload;
+  exampleSignals: ExampleSignals;
 }): Promise<GenerateResult> {
-  const { baseMarkdown, baseRawSession, surveyTemplate, lockedHeaderBlock, milestoneOutline, sentiment, idx, payload } = options;
+  const { baseMarkdown, baseRawSession, surveyTemplate, lockedHeaderBlock, milestoneOutline, sentiment, idx, payload, exampleSignals } = options;
 
   const seedUsed = `${payload.seedLabel}:${idx + 1}`;
   const sessionId = createSessionId(payload.seedLabel, idx);
   const baseSeed = hashSeed(seedUsed);
   const rng = createRng(baseSeed);
-  const scenario = buildScenarioPlan(rng);
+  const scenario = buildScenarioPlan(rng, exampleSignals);
   const applicationAnswerCount =
     (baseRawSession.application?.reasons?.length ?? 0) +
     (baseRawSession.application?.challenges?.length ?? 0);

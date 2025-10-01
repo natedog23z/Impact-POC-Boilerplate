@@ -51,21 +51,21 @@ export const THERAPIST_FIRST_NAMES = [
 ];
 
 export const PROGRAM_REASONS = [
-  'Seeking practical coping tools for daily stressors.',
-  'Looking for accountability while navigating a life transition.',
-  'Hoping to build healthier routines around sleep and work.',
-  'Wanting support to reduce anxiety and improve focus.',
-  'Preparing for increased responsibilities at work and home.',
-  'Trying to rebuild confidence after a difficult season.',
+  'Hoping to build community and spark meaningful conversations.',
+  'Looking for engaging ways to invite friends into faith dialogue.',
+  'Seeking clear, simple next steps to host consistent gatherings.',
+  'Wanting to create welcoming spaces with food and discussion.',
+  'Preparing to lead a series of watch parties across the semester.',
+  'Trying a new evangelistic initiative to reach students.',
 ];
 
 export const PROGRAM_CHALLENGES = [
-  'Balancing academic demands with family expectations.',
-  'Managing recurring comparison thoughts with peers.',
-  'Staying consistent with healthy routines on busy weeks.',
-  'Feeling isolated after relocating to a new city.',
-  'Struggling to maintain energy due to poor sleep hygiene.',
-  'Avoiding procrastination on important but overwhelming tasks.',
+  'Coordinating schedules and finding rooms for larger groups.',
+  'Keeping consistent weekly cadence across busy exam periods.',
+  'Encouraging authentic discussion among mixed-belief attendees.',
+  'Maintaining momentum beyond the first two episodes.',
+  "Ensuring there's enough food and volunteers each week.",
+  'Promoting events effectively on campus and social media.',
 ];
 
 export const REFLECTION_SEED_PHRASES = [

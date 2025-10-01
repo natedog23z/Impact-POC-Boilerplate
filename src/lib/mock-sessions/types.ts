@@ -57,11 +57,25 @@ export type ReflectionMilestone = {
   };
 };
 
+export type OnlineActivityMilestone = {
+  type: 'Online Activity';
+  title: string;
+  description?: string;
+  completedAt?: string;
+  // Legacy
+  activityLink?: string;
+  // Canonical footer format
+  activity?: {
+    link?: string;
+  };
+};
+
 export type Milestone =
   | ApplicantSurveyMilestone
   | MeetingMilestone
   | OutcomeNoteMilestone
-  | ReflectionMilestone;
+  | ReflectionMilestone
+  | OnlineActivityMilestone;
 
 export type RawSession = {
   rawSchemaVersion: 'v1';

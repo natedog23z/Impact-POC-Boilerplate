@@ -93,7 +93,8 @@ export async function runImpactPipelineInline(
   }
 
   if (!sessionFacts.length) {
-    throw new Error('Failed to build SessionFacts from provided RawSessions.');
+    const details = skipped.length ? ` Reasons (per session):\n- ${skipped.join('\n- ')}` : '';
+    throw new Error(`Failed to build SessionFacts from provided RawSessions.${details}`);
   }
 
   const cohortFacts = buildCohortFacts(sessionFacts);

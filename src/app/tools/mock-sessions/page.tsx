@@ -453,7 +453,11 @@ export default function MockSessionsPage() {
       const result = await runImpactPipelineInline(raws, overrides);
       setPipeline({ status: 'completed', result });
     } catch (err) {
-      setPipeline({ status: 'error', message: err instanceof Error ? err.message : 'Pipeline failed.' });
+      // Attempt to extract any skipped details from console logs is not feasible here;
+      // instead, show a friendly hint.
+      const message = err instanceof Error ? err.message : 'Pipeline failed.';
+      const hint = ' Tip: open devtools console for details. Ensure OPENAI_API_KEY is set for extraction.';
+      setPipeline({ status: 'error', message: `${message}${hint}` });
     }
   };
 
@@ -468,9 +472,22 @@ export default function MockSessionsPage() {
           </Button>
         </Flex>
         {pipeline.status === 'error' && (
-          <Text size="2" color="red" style={{ marginTop: 8 }}>
-            {pipeline.message}
-          </Text>
+          <>
+            <Text size="2" color="red" style={{ marginTop: 8 }}>
+              {pipeline.message}
+            </Text>
+            {state.status === 'completed' && (
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: 'pointer' }}>Show generated JSON footers (debug)</summary>
+                <TextArea
+                  readOnly
+                  size="2"
+                  style={{ marginTop: 8, width: '100%', minHeight: 160 }}
+                  value={JSON.stringify(state.files.map((f) => f.json).filter(Boolean), null, 2)}
+                />
+              </details>
+            )}
+          </>
         )}
         {pipeline.status === 'completed' && renderPipelineResults(pipeline.result)}
       </Card>

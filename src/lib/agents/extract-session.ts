@@ -32,9 +32,7 @@ const MODEL_NAME = 'gpt-4o-mini';
 export const EXTRACTION_AGENT_VERSION = 'session-extract@0.1.0';
 
 const apiKey = process.env.OPENAI_API_KEY;
-if (!apiKey) {
-  throw new Error('OPENAI_API_KEY is required for session extraction.');
-}
+const EXTRACTION_ENABLED = Boolean(apiKey);
 
 const openai = createOpenAI({
   apiKey,
@@ -60,30 +58,52 @@ export async function extractSessionSignals(
       } satisfies SessionExtraction;
     }
 
-    const { object } = await generateObject({
-      model: openai(modelName),
-      schema: extractionSchema,
-      temperature: 0.2,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: buildUserPrompt(session.sessionId, context),
-        },
-      ],
-    });
+    // If API key is missing or generation fails, fall back to empty tags
+    if (!EXTRACTION_ENABLED) {
+      return {
+        strengths: [],
+        improvements: [],
+        themes: [],
+        quotes: [],
+        model: 'none',
+      } satisfies SessionExtraction;
+    }
 
-    return {
-      strengths: [...object.strengths],
-      improvements: [...object.improvements],
-      themes: [...object.themes],
-      quotes: object.quotes.map((quote) => ({
-        sessionId: session.sessionId,
-        text: quote.text,
-        theme: quote.theme,
-      })),
-      model: modelName,
-    } satisfies SessionExtraction;
+    try {
+      const { object } = await generateObject({
+        model: openai(modelName),
+        schema: extractionSchema,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: buildUserPrompt(session.sessionId, context),
+          },
+        ],
+      });
+
+      return {
+        strengths: [...object.strengths],
+        improvements: [...object.improvements],
+        themes: [...object.themes],
+        quotes: object.quotes.map((quote) => ({
+          sessionId: session.sessionId,
+          text: quote.text,
+          theme: quote.theme,
+        })),
+        model: modelName,
+      } satisfies SessionExtraction;
+    } catch (error) {
+      console.warn('Session extraction failed; continuing with empty tags', error);
+      return {
+        strengths: [],
+        improvements: [],
+        themes: [],
+        quotes: [],
+        model: 'none',
+      } satisfies SessionExtraction;
+    }
   });
 }
 

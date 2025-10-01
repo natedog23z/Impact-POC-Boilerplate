@@ -1,4 +1,4 @@
-import { RawSession, QA, Milestone, ApplicantSurveyMilestone, MeetingMilestone, OutcomeNoteMilestone, ReflectionMilestone } from './types';
+import { RawSession, QA, Milestone, ApplicantSurveyMilestone, MeetingMilestone, OutcomeNoteMilestone, ReflectionMilestone, OnlineActivityMilestone } from './types';
 import { SURVEY_KEY_MAP, SurveyKey } from './surveyKeys';
 
 const JSON_FOOTER_REGEX = /```json\s*([\s\S]+?)```/gi;
@@ -123,7 +123,12 @@ const parseBulletRecord = (section: string) => {
 const emptyToUndefined = (value?: string) => {
   if (value === undefined) return undefined;
   const trimmed = value.trim();
-  return trimmed.length ? trimmed : undefined;
+  if (!trimmed) return undefined;
+  const lower = trimmed.toLowerCase();
+  if (lower === 'undefined' || lower === 'null' || lower === 'n/a' || lower === 'na' || lower === 'tbd') {
+    return undefined;
+  }
+  return trimmed;
 };
 
 const detectScaleAnswer = (value: string, surveyKey?: SurveyKey): number | string => {
@@ -221,7 +226,14 @@ const parseApplicantSurveyMilestone = (
   const matches = [...body.matchAll(regex)];
 
   if (!matches.length) {
-    throw new ParseError(`Applicant survey milestone missing questions (${base.title ?? 'unknown'})`);
+    // Tolerate empty survey blocks in examples; return an empty survey
+    return {
+      type: 'Applicant Survey',
+      title: base.title ?? 'Applicant Survey',
+      description: base.description,
+      completedAt: base.completedAt,
+      qa: [],
+    };
   }
 
   for (const match of matches) {
@@ -367,6 +379,23 @@ const parseOutcomeNoteMilestone = (
   };
 };
 
+const parseOnlineActivityMilestone = (
+  body: string,
+  base: { title?: string; description?: string; completedAt?: string },
+): OnlineActivityMilestone => {
+  const details = parseBulletRecord(body);
+  return {
+    type: 'Online Activity',
+    title: base.title ?? 'Online Activity',
+    description: base.description,
+    completedAt: base.completedAt,
+    activityLink: emptyToUndefined(details['Activity Link']) ?? emptyToUndefined(details['Link']) ?? emptyToUndefined(details['URL']),
+    activity: {
+      link: emptyToUndefined(details['Activity Link']) ?? emptyToUndefined(details['Link']) ?? emptyToUndefined(details['URL']),
+    },
+  };
+};
+
 const parseReflectionMilestone = (
   body: string,
   base: { title?: string; description?: string; completedAt?: string },
@@ -391,7 +420,7 @@ const parseMilestones = (section: string): Milestone[] => {
   const milestones: Milestone[] = [];
 
   for (const segment of segments) {
-  const [metaPart, ...restParts] = segment.split(/\n\s*-\s*(Applicant Survey Milestone|Meeting Milestone|Outcome Reporting Milestone|Reflection Milestone)/i);
+  const [metaPart, ...restParts] = segment.split(/\n\s*-\s*(Applicant Survey Milestone|Meeting Milestone|Outcome Reporting Milestone|Reflection Milestone|Online Activity Milestone)/i);
     if (!restParts.length) {
       throw new ParseError('Unable to detect milestone type');
     }
@@ -423,6 +452,10 @@ const parseMilestones = (section: string): Milestone[] => {
     }
     if (typeIndicator.startsWith('reflection')) {
       milestones.push(parseReflectionMilestone(body, base));
+      continue;
+    }
+    if (typeIndicator.startsWith('online activity')) {
+      milestones.push(parseOnlineActivityMilestone(body, base));
       continue;
     }
 
@@ -503,7 +536,7 @@ export const extractMilestoneOutline = (markdown: string) => {
     .map((s) => s.trim())
     .filter(Boolean);
   const outline = segments.map((segment) => {
-    const [metaPart, ...restParts] = segment.split(/\n\s*-\s*(Applicant Survey Milestone|Meeting Milestone|Outcome Reporting Milestone|Reflection Milestone)/i);
+    const [metaPart, ...restParts] = segment.split(/\n\s*-\s*(Applicant Survey Milestone|Meeting Milestone|Outcome Reporting Milestone|Reflection Milestone|Online Activity Milestone)/i);
     const meta = parseBulletRecord(metaPart);
     const typeIndicator = restParts[0]?.trim() ?? '';
     const type = (/^applicant survey/i.test(typeIndicator)
@@ -514,6 +547,8 @@ export const extractMilestoneOutline = (markdown: string) => {
       ? 'Outcome Note'
       : /^reflection/i.test(typeIndicator)
       ? 'Reflection'
+      : /^online activity/i.test(typeIndicator)
+      ? 'Online Activity'
       : 'Unknown');
     return {
       type,
