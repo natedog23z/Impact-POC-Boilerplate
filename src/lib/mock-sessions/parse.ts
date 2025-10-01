@@ -426,6 +426,23 @@ const deriveIds = (content: string) => {
   };
 };
 
+const findMilestonesSection = (content: string): string => {
+  const candidates = [
+    'Session Milestones:',
+    'Session Milestones',
+    'Milestones:',
+    'Milestones',
+  ];
+  for (const heading of candidates) {
+    const loc = locateHeading(content, heading);
+    if (loc) {
+      return sliceBetween(content, heading, 'Overall session outcome reports:');
+    }
+  }
+  // Fallback to original (will throw detailed error)
+  return sliceBetween(content, 'Session Milestones:', 'Overall session outcome reports:');
+};
+
 export const parseMockSession = (markdown: string): RawSession => {
   const normalized = normalizeInput(markdown);
   const { content } = removeJsonFooter(normalized);
@@ -434,7 +451,7 @@ export const parseMockSession = (markdown: string): RawSession => {
 
   const demographicsSection = sliceBetween(content, 'Participant Demographics:', 'Program Application:');
   const applicationSection = sliceBetween(content, 'Program Application:', 'Scholarship Application:');
-  const milestonesSection = sliceBetween(content, 'Session Milestones:', 'Overall session outcome reports:');
+  const milestonesSection = findMilestonesSection(content);
 
   const demographics = parseBulletRecord(demographicsSection);
   const applicationRaw = parseApplication(applicationSection);
@@ -465,7 +482,7 @@ export const parseMockSession = (markdown: string): RawSession => {
 export const extractMilestoneOutline = (markdown: string) => {
   const normalized = normalizeInput(markdown);
   const { content } = removeJsonFooter(normalized);
-  const milestonesSection = sliceBetween(content, 'Session Milestones:', 'Overall session outcome reports:');
+  const milestonesSection = findMilestonesSection(content);
   const segments = milestonesSection
     .split(/\n\s*Milestone:\s*\n/)
     .map((s) => s.trim())
