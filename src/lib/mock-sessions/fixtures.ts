@@ -98,8 +98,6 @@ export const BIRTH_YEAR_BUCKETS = [
 export const GENDER_CHOICES = [
   'Female',
   'Male',
-  'Non-binary / third gender',
-  'Prefer not to say',
 ];
 
 export const ETHNICITY_CHOICES = [
