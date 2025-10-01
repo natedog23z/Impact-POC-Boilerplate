@@ -25,7 +25,7 @@ export type SessionExtraction = {
   model: string;
 };
 
-const SYSTEM_PROMPT = `You analyze counseling program session notes. Return concise tags that represent participant strengths, improvement targets, and overarching themes. Use only language present in the supplied reflections and outcome notes. Avoid diagnoses, assumptions, or new facts. Provide 1–2 short quotes already present in the text. Do not fabricate content.`;
+const SYSTEM_PROMPT = `You analyze program session notes. Return concise tags that represent participant strengths, improvement targets, and overarching themes. Use only language present in the supplied reflections and outcome notes. Avoid diagnoses, assumptions, or new facts. Provide 1–2 short quotes already present in the text. Do not fabricate content.`;
 
 const defaultLimiter = pLimit(8);
 const MODEL_NAME = 'gpt-4o-mini';
