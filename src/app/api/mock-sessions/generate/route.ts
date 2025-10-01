@@ -16,11 +16,9 @@ import {
   PARTICIPANT_FIRST_NAMES,
   PARTICIPANT_LAST_NAMES,
   ZIP_CODES,
-  THERAPIST_FIRST_NAMES,
   PROGRAM_REASONS,
   PROGRAM_CHALLENGES,
   REFLECTION_SEED_PHRASES,
-  MEETING_DETAILS,
   CHURCH_ATTENDANCE_CHOICES,
   BIRTH_YEAR_BUCKETS,
   GENDER_CHOICES,
@@ -46,7 +44,7 @@ const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are an elite content generator that fabricates realistic, human-like counseling session artifacts.\n\nYou must:\n- Mirror the provided example's structure, headings, bullet styles, and separators exactly.\n- Never include commentary outside the document.\n- Always append a fenced \`json\` code block describing the RawSession payload.\n- Honor omission instructions while keeping all headings and required anchors.\n- Use plain UTF-8 text (no smart quotes unless provided) and avoid trailing commentary.`;
+const SYSTEM_PROMPT = `You are an elite content generator that fabricates realistic, human-like program session artifacts.\n\nCarefully study the provided example to infer the program’s intent, domain, structure, tone, headings, bullet styles, separators, and data anchors. Mirror the example’s terminology (including role titles) and formatting exactly while varying content within the provided guidance.\n\nClone the milestone frame from the example: names, types, order, and descriptions must remain identical. Do not introduce or modify roles, headings, or milestone details. Only vary the milestone content fields: application answers, reflection text, and outcome reports (including plan items).\n\nNever include commentary outside the document. Always append a fenced \`json\` code block describing the RawSession payload. Use plain UTF-8 text (no smart quotes unless provided) and avoid trailing commentary.`;
 
 const STRICT_REMINDER = `STRICT MODE REMINDER:\n- Match headings exactly.\n- Maintain all milestone sections.\n- Keep numeric scales at integers between 1 and 10.\n- Ensure JSON footer is valid and matches the document.`;
 
@@ -116,8 +114,6 @@ type ScenarioPlan = {
     zipCode: string;
     ethnicity: string;
   };
-  therapistName: string;
-  meetingDetail: string;
   programReasons: string[];
   programChallenges: string[];
   reflectionHint: string;
@@ -388,8 +384,6 @@ function randomId(rng: () => number, length: number = 26): string {
 function buildScenarioPlan(rng: () => number): ScenarioPlan {
   const participantFirst = pick(rng, PARTICIPANT_FIRST_NAMES);
   const participantLast = pick(rng, PARTICIPANT_LAST_NAMES);
-  const therapistFirst = pick(rng, THERAPIST_FIRST_NAMES);
-  const therapistLast = pick(rng, PARTICIPANT_LAST_NAMES);
 
   return {
     participant: {
@@ -399,8 +393,6 @@ function buildScenarioPlan(rng: () => number): ScenarioPlan {
       zipCode: pick(rng, ZIP_CODES),
       ethnicity: pick(rng, ETHNICITY_CHOICES),
     },
-    therapistName: `${therapistFirst} ${therapistLast}`,
-    meetingDetail: pick(rng, MEETING_DETAILS),
     programReasons: pickMany(rng, PROGRAM_REASONS, 2 + Math.floor(rng() * 2)),
     programChallenges: pickMany(rng, PROGRAM_CHALLENGES, 2 + Math.floor(rng() * 2)),
     reflectionHint: pick(rng, REFLECTION_SEED_PHRASES),
@@ -527,7 +519,7 @@ function buildUserPrompt(options: {
     .map((m, i) => `  ${String(i + 1).padStart(2, '0')}. [${m.type}] ${m.title ?? '(untitled)'}${m.description ? ` — ${m.description}` : ''}`)
     .join('\n');
 
-  return `---BEGIN EXAMPLE---\n${exampleText}\n---END EXAMPLE---\n\nGenerate ONE new mock session document that mirrors the exact structure, headings, bullet styles, dividers, and ordering of the example. Use fresh story content that matches the guidance below. ${strictAddendum}\n\nLOCKED PROGRAM HEADER (copy exactly, but set the Version id in the heading to the Session ID below):\n${lockedHeaderBlock}\n\nContext:\n- Seed: ${seedUsed}\n- Session ID to use as the Version id in the heading: ${sessionId}\n- Sentiment target: ${sentiment}\n- Participant name: ${scenario.participant.name}\n- Participant gender: ${scenario.participant.gender}\n- Participant birth year bucket: ${scenario.participant.birthYearBucket}\n- Participant ZIP code: ${scenario.participant.zipCode}\n- Participant ethnicity: ${scenario.participant.ethnicity}\n- Therapist name: ${scenario.therapistName}\n- Meeting detail hint: ${scenario.meetingDetail}\n- Program motivations to weave in: ${scenario.programReasons.join('; ')}\n- Program challenges to mention: ${scenario.programChallenges.join('; ')}\n- Reflection tone hint: ${scenario.reflectionHint}\n\nMilestone skeleton (keep these titles, types, order, and descriptions exactly; only vary the milestone responses/answers/notes):\n${lockedMilestonesText}\n\nSentiment guidance: ${buildSentimentGuidance(sentiment)}\n\nSurvey keys (keep labels identical, values must be integers 1-10):\n${buildSurveyKeyInstructions(surveyTemplate)}\n\n${formatOmissionPlan(omissionPlan)}\n\nCanonical JSON footer schema (no alternates):\n- For Applicant Survey milestones: use an \"answers\" object mapping survey keys to integers (1-10) or null for omissions. Do not include \"qa\" or \"survey\" arrays.\n- For Meeting milestones: include a \"meeting\" object with optional fields { with, details, schedulingLink }. Do not place these at the root.\n- For Reflection milestones: include a \"reflection\" object with { text }.\n- For Outcome Reporting milestones: include \"markdownOutcome\" with { date, focus, notes, plan[] }.\n- Never include duplicate or second timelines; produce one single 3-week window mirroring the example.\n- Never output empty strings for survey omissions; use null instead.\n\nAdditional rules:\n- Use ISO timestamps within the last 60 days and keep chronological order.\n- Maintain all milestone headings and the given titles verbatim.\n- Never duplicate names or locations from the example.\n- Keep at least two survey items with answers in BOTH pre and post sections.\n- When omitting content, leave the label but no text after the colon or bullet.\n- Reflection paragraph must be under 120 words even when brief.\n- Append a fenced \`json\` block representing the RawSession; it must include rawSchemaVersion 'v1', generatorVersion '${GENERATOR_VERSION}', seed '${seedUsed}', sessionId '${sessionId}', and sentiment '${sentiment}'.\n- JSON must contain milestones mirroring the document (Applicant Survey, Meeting, Outcome Note with markdownOutcome including plan array, Reflection, Post-Survey, Final Report).\n- Do not add commentary before or after the document.`;
+  return `---BEGIN EXAMPLE---\n${exampleText}\n---END EXAMPLE---\n\nGenerate ONE new mock session document that mirrors the exact structure, headings, bullet styles, dividers, and ordering of the example. Use fresh story content that matches the guidance below. ${strictAddendum}\n\nLOCKED PROGRAM HEADER (copy exactly, but set the Version id in the heading to the Session ID below):\n${lockedHeaderBlock}\n\nContext:\n- Seed: ${seedUsed}\n- Session ID to use as the Version id in the heading: ${sessionId}\n- Sentiment target: ${sentiment}\n- Participant name: ${scenario.participant.name}\n- Participant gender: ${scenario.participant.gender}\n- Participant birth year bucket: ${scenario.participant.birthYearBucket}\n- Participant ZIP code: ${scenario.participant.zipCode}\n- Participant ethnicity: ${scenario.participant.ethnicity}\n- Program motivations to weave in: ${scenario.programReasons.join('; ')}\n- Program challenges to mention: ${scenario.programChallenges.join('; ')}\n- Reflection tone hint: ${scenario.reflectionHint}\n\nMilestone skeleton (keep these titles, types, order, and descriptions exactly; only vary the milestone responses/answers/notes):\n${lockedMilestonesText}\n\nSentiment guidance: ${buildSentimentGuidance(sentiment)}\n\nSurvey keys (keep labels identical, values must be integers 1-10):\n${buildSurveyKeyInstructions(surveyTemplate)}\n\n${formatOmissionPlan(omissionPlan)}\n\nCanonical JSON footer schema (no alternates):\n- For Applicant Survey milestones: use an "answers" object mapping survey keys to integers (1-10) or null for omissions. Do not include "qa" or "survey" arrays.\n- For Meeting milestones: include a "meeting" object with optional fields { with, details, schedulingLink }. Do not place these at the root.\n- For Reflection milestones: include a "reflection" object with { text }.\n- For Outcome Reporting milestones: include "markdownOutcome" with { date, focus, notes, plan[] }.\n- Never include duplicate or second timelines; produce one single 3-week window mirroring the example.\n- Never output empty strings for survey omissions; use null instead.\n\nAdditional rules:\n- Use ISO timestamps within the last 60 days and keep chronological order.\n- Maintain all milestone headings and the given titles verbatim.\n- Never duplicate names or locations from the example.\n- Keep at least two survey items with answers in BOTH pre and post sections.\n- When omitting content, leave the label but no text after the colon or bullet.\n- Reflection paragraph must be under 120 words even when brief.\n- Append a fenced \`json\` block representing the RawSession; it must include rawSchemaVersion 'v1', generatorVersion '${GENERATOR_VERSION}', seed '${seedUsed}', sessionId '${sessionId}', and sentiment '${sentiment}'.\n- JSON must contain milestones mirroring the document (Applicant Survey, Meeting, Outcome Note with markdownOutcome including plan array, Reflection, Post-Survey, Final Report).\n- Do not add commentary before or after the document.`;
 }
 
 function canonicalizeRawSession(
@@ -617,10 +609,11 @@ function canonicalizeRawSession(
     }
 
     if (/^meeting$/i.test(o.type)) {
+      const bm = baseMatch('Meeting', o.title) as any;
       core.meeting = {
-        with: m.meeting?.with,
-        details: m.meeting?.details ?? m.details,
-        schedulingLink: m.meeting?.schedulingLink ?? m.schedulingLink,
+        with: bm?.meeting?.with ?? bm?.with ?? m.meeting?.with,
+        details: bm?.meeting?.details ?? bm?.details ?? m.meeting?.details ?? m.details,
+        schedulingLink: bm?.meeting?.schedulingLink ?? bm?.schedulingLink ?? m.meeting?.schedulingLink ?? m.schedulingLink,
       };
       return core;
     }
