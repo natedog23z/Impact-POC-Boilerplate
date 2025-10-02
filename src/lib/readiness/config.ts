@@ -43,8 +43,8 @@ export interface ReadinessConfig {
       minConfidence: number;
     };
     participantReasons: {
-      minDocs: number;
-      minConfidence: number;
+      minReasonsUnique: number;
+      minSessionsWithReasons: number;
     };
     testimonials: {
       minCount: number;
@@ -104,8 +104,8 @@ export const DEFAULT_READINESS_CONFIG: ReadinessConfig = {
       minConfidence: 0.6,
     },
     participantReasons: {
-      minDocs: 5,
-      minConfidence: 0.6,
+      minReasonsUnique: 3,
+      minSessionsWithReasons: 3,
     },
     testimonials: {
       minCount: 3,

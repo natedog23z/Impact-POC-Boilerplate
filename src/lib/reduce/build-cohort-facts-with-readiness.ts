@@ -59,6 +59,7 @@ function buildReadinessInput(
   
   // Extract session documents with confidence scores
   const sessionDocs = extractSessionDocs(sessions);
+  const reasons = extractApplicationReasonsSummary(sessions);
   
   // Extract testimonials (quotes as proxy)
   const testimonials = extractTestimonials(sessions);
@@ -77,6 +78,7 @@ function buildReadinessInput(
   return {
     surveys: surveyData,
     sessionDocs,
+    reasons,
     testimonials,
     groups,
     facts: factsData,
@@ -242,5 +244,20 @@ function computeItemLevelStats(sessions: SessionFacts[]): Record<string, { nullC
   }
   
   return Object.fromEntries(stats);
+}
+
+/**
+ * Summarize application reasons coverage across sessions
+ */
+function extractApplicationReasonsSummary(sessions: SessionFacts[]): { sessionsWithReasons: number; uniqueReasons: number } {
+  const sessionsWithReasons = sessions.filter((s) => Array.isArray(s.reasons) && s.reasons.length > 0).length;
+  const allReasons = new Set<string>();
+  for (const s of sessions) {
+    for (const r of s.reasons) {
+      const trimmed = r.trim();
+      if (trimmed) allReasons.add(trimmed.toLowerCase());
+    }
+  }
+  return { sessionsWithReasons, uniqueReasons: allReasons.size };
 }
 

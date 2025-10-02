@@ -368,30 +368,51 @@ function evaluateParticipantReasons(
   llm: LLMQuality,
   config: ReadinessConfig
 ): PanelReadiness {
-  const minDocs = config.panels.participantReasons.minDocs;
-  const minConfidence = config.panels.participantReasons.minConfidence;
-  
-  const docs = llm.sessionDocs;
-  const avgConfidence = llm.avgConfidence;
-  
   const reasons: string[] = [];
   const unlock: string[] = [];
-  
+
+  const hasAppReasons = input.reasons?.sessionsWithReasons && input.reasons.uniqueReasons ? input.reasons.sessionsWithReasons > 0 && input.reasons.uniqueReasons > 0 : false;
+
+  if (hasAppReasons) {
+    const sessionsWithReasons = input.reasons!.sessionsWithReasons;
+    const uniqueReasons = input.reasons!.uniqueReasons;
+    const ready = sessionsWithReasons >= (config.panels.participantReasons as any).minSessionsWithReasons && uniqueReasons >= (config.panels.participantReasons as any).minReasonsUnique;
+    if (!ready) {
+      if (sessionsWithReasons < (config.panels.participantReasons as any).minSessionsWithReasons) {
+        reasons.push('Not enough participants with application reasons');
+        unlock.push(`Collect application Q/A for ${((config.panels.participantReasons as any).minSessionsWithReasons - sessionsWithReasons)} more participant${(config.panels.participantReasons as any).minSessionsWithReasons - sessionsWithReasons > 1 ? 's' : ''}`);
+      }
+      if (uniqueReasons < (config.panels.participantReasons as any).minReasonsUnique) {
+        reasons.push('Too few unique reason categories');
+        unlock.push('Broaden application question prompts or categorize reasons');
+      }
+    }
+    return {
+      ready,
+      inputs: { sessionsWithReasons, uniqueReasons, minSessions: (config.panels.participantReasons as any).minSessionsWithReasons, minUnique: (config.panels.participantReasons as any).minReasonsUnique },
+      reasons,
+      unlock,
+    };
+  }
+
+  // Fallback to LLM docs if application reasons are absent
+  const minDocs = (config.llm?.minDocuments ?? 5);
+  const minConfidence = (config.llm?.minAvgConfidence ?? 0.6);
+  const docs = llm.sessionDocs;
+  const avgConfidence = llm.avgConfidence;
+
   let ready = true;
-  
   if (docs < minDocs) {
     ready = false;
     reasons.push('Not enough source documents');
     const needed = minDocs - docs;
     unlock.push(`Add ${needed} more session reflection${needed > 1 ? 's' : ''}`);
   }
-  
   if (avgConfidence < minConfidence) {
     ready = false;
     reasons.push('LLM confidence below threshold');
     unlock.push('Improve transcript or reflection quality');
   }
-  
   return {
     ready,
     inputs: { docs, requiredDocs: minDocs, avgConfidence, minConfidence },

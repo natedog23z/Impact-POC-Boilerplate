@@ -89,6 +89,12 @@ export interface ReadinessInput {
     confidence?: number;
   }>;
   
+  // Reasons collected from Program Application
+  reasons?: {
+    sessionsWithReasons: number;
+    uniqueReasons: number;
+  };
+  
   // Testimonials
   testimonials?: Array<{
     id: string;
