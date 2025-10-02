@@ -29,6 +29,7 @@ import KeyAreasChallengesCard from '@/components/dashboard/KeyAreasChallengesCar
 import KeyThemesCard from '@/components/dashboard/KeyThemesCard';
 import FlourishingOutcomesGrid from '@/components/dashboard/FlourishingOutcomesGrid';
 import TestimonialsCard from '@/components/dashboard/TestimonialsCard';
+import { PanelGate } from '@/components/readiness/PanelGate';
 import { SURVEY_KEY_MAP } from '@/lib/mock-sessions/surveyKeys';
 import {
   OVERALL_IMPACT_SYSTEM_PROMPT,
@@ -596,71 +597,87 @@ export default function MockSessionsPage() {
         <Box style={{ marginTop: 12, overflow: 'visible' }}>
         <Flex gap="4" align="stretch" wrap="wrap">
           <Box style={{ flex: 1, minWidth: 320 }}>
-            <OverallImpactCard prose={data.sections.overallImpact.prose} />
+            <PanelGate panelId="overallImpact" readiness={data.readiness.panels.overallImpact}>
+              <OverallImpactCard prose={data.sections.overallImpact.prose} />
+            </PanelGate>
           </Box>
           <Box style={{ flex: 1, minWidth: 360 }}>
-            <ImprovementDonutCard
-              headingPercent={improvement.headingPct}
-              nCompleted={improvement.nCompleted}
-              breakdown={improvement.breakdown}
-            />
+            <PanelGate panelId="improvementDonut" readiness={data.readiness.panels.improvementDonut}>
+              <ImprovementDonutCard
+                headingPercent={improvement.headingPct}
+                nCompleted={improvement.nCompleted}
+                breakdown={improvement.breakdown}
+              />
+            </PanelGate>
           </Box>
         </Flex>
         </Box>
         {/* Testimonials section */}
         <Box style={{ marginTop: 12 }}>
-          <TestimonialsCard
-            title="Testimonials"
-            quotes={data.cohortFacts.exemplarQuotes}
-            sourceNote="Sourced from participant reflections & outcome notes"
-          />
+          <PanelGate panelId="testimonials" readiness={data.readiness.panels.testimonials}>
+            <TestimonialsCard
+              title="Testimonials"
+              quotes={data.cohortFacts.exemplarQuotes}
+              sourceNote="Sourced from participant reflections & outcome notes"
+            />
+          </PanelGate>
         </Box>
         {/* Key Areas of Impact & Primary Challenges Addressed */}
         <Box style={{ marginTop: 12 }}>
-          <KeyAreasChallengesCard
-            proseLeft={(data.sections.keyAreasChallenges.prose.split('\n\n')[0]) || ''}
-            proseRight={(data.sections.keyAreasChallenges.prose.split('\n\n')[1] || data.sections.keyAreasChallenges.prose) || ''}
-            impacts={(data.sections.keyAreasChallenges.component as any).impacts || []}
-            challenges={(data.sections.keyAreasChallenges.component as any).challenges || []}
-          />
+          <PanelGate panelId="keyAreasChallenges" readiness={data.readiness.panels.keyAreasChallenges}>
+            <KeyAreasChallengesCard
+              proseLeft={(data.sections.keyAreasChallenges.prose.split('\n\n')[0]) || ''}
+              proseRight={(data.sections.keyAreasChallenges.prose.split('\n\n')[1] || data.sections.keyAreasChallenges.prose) || ''}
+              impacts={(data.sections.keyAreasChallenges.component as any).impacts || []}
+              challenges={(data.sections.keyAreasChallenges.component as any).challenges || []}
+            />
+          </PanelGate>
         </Box>
         {/* Key Themes section */}
         <Box style={{ marginTop: 12 }}>
-          <KeyThemesCard
-            prose={data.sections.keyThemes.prose}
-            themes={(data.sections.keyThemes.component as any).themes || []}
-            sourceNote="Source of Data"
-          />
+          <PanelGate panelId="keyThemes" readiness={data.readiness.panels.keyThemes}>
+            <KeyThemesCard
+              prose={data.sections.keyThemes.prose}
+              themes={(data.sections.keyThemes.component as any).themes || []}
+              sourceNote="Source of Data"
+            />
+          </PanelGate>
         </Box>
         {/* Strengths/Improvements section */}
         <Box style={{ marginTop: 12 }}>
-          <StrengthsImprovementsCard
-            prose={data.sections.strengthsImprovements.prose}
-            strengths={(data.sections.strengthsImprovements.component as any).strengths || []}
-            improvements={(data.sections.strengthsImprovements.component as any).improvements || []}
-          />
+          <PanelGate panelId="strengthsImprovements" readiness={data.readiness.panels.strengthsImprovements}>
+            <StrengthsImprovementsCard
+              prose={data.sections.strengthsImprovements.prose}
+              strengths={(data.sections.strengthsImprovements.component as any).strengths || []}
+              improvements={(data.sections.strengthsImprovements.component as any).improvements || []}
+            />
+          </PanelGate>
         </Box>
         {/* Participant Reasons section */}
         <Box style={{ marginTop: 12 }}>
-          <ParticipantReasonsCard
-            prose={data.sections.participantReasons.prose}
-            reasons={(data.sections.participantReasons.component as any).reasons || []}
-            offeringName={extractOfferingNameFromHeader(lockedHeader)}
-          />
+          <PanelGate panelId="participantReasons" readiness={data.readiness.panels.participantReasons}>
+            <ParticipantReasonsCard
+              prose={data.sections.participantReasons.prose}
+              reasons={(data.sections.participantReasons.component as any).reasons || []}
+              offeringName={extractOfferingNameFromHeader(lockedHeader)}
+            />
+          </PanelGate>
         </Box>
         <Separator style={{ marginTop: 16, marginBottom: 16 }} />
-        <FlourishingOutcomesGrid
-          prose={data.sections.assessmentOutcomes.prose}
-          categories={((data.sections.assessmentCategories.component as any)?.categories || []).map((c: any) => ({
-            key: c.key,
-            title: c.title,
-            description: c.description,
-            percentImproved: c.percentImproved ?? null,
-          }))}
-        />
+        <PanelGate panelId="flourishingGrid" readiness={data.readiness.panels.flourishingGrid}>
+          <FlourishingOutcomesGrid
+            prose={data.sections.assessmentOutcomes.prose}
+            categories={((data.sections.assessmentCategories.component as any)?.categories || []).map((c: any) => ({
+              key: c.key,
+              title: c.title,
+              description: c.description,
+              percentImproved: c.percentImproved ?? null,
+            }))}
+          />
+        </PanelGate>
         <Separator style={{ marginTop: 16, marginBottom: 16 }} />
-        <Heading size="3">CohortFacts (debug)</Heading>
-        <TextArea readOnly value={JSON.stringify(data.cohortFacts, null, 2)} style={{ fontFamily: 'monospace', minHeight: 200 }} />
+        <Heading size="3">CohortFacts + Readiness (debug)</Heading>
+        <TextArea readOnly value={JSON.stringify({ facts: data.cohortFacts, readiness: data.readiness }, null, 2)} style={{ fontFamily: 'monospace', minHeight: 200 }} />
       </>
     );
   };

@@ -4,7 +4,7 @@ import pLimit from 'p-limit';
 
 import type { RawSession } from '@/lib/mock-sessions/types';
 import { buildSessionFacts } from '@/lib/map/build-session-facts';
-import { buildCohortFacts } from '@/lib/reduce/build-cohort-facts';
+import { buildCohortFactsWithReadiness } from '@/lib/reduce/build-cohort-facts-with-readiness';
 import { composeAssessmentOutcomes } from '@/lib/compose/assessment-outcomes';
 import { composeAssessmentCategories } from '@/lib/compose/assessment-categories';
 import { composeOverallImpact } from '@/lib/compose/overall-impact';
@@ -40,6 +40,7 @@ export type PipelineMeta = {
 
 export type RunPipelineInlineResponse = {
   cohortFacts: CohortFacts;
+  readiness: import('@/lib/readiness/types').ReadinessResult;
   sections: PipelineSections;
   sessionFacts: SessionFacts[];
   meta: PipelineMeta;
@@ -97,7 +98,8 @@ export async function runImpactPipelineInline(
     throw new Error(`Failed to build SessionFacts from provided RawSessions.${details}`);
   }
 
-  const cohortFacts = buildCohortFacts(sessionFacts);
+  // Build cohort facts + readiness (deterministic gates)
+  const { facts: cohortFacts, readiness } = buildCohortFactsWithReadiness(sessionFacts);
 
   const [assessmentOutcomes, assessmentCategories, overallImpact, strengthsImprovements, participantReasons, keyAreasChallenges, keyThemes] = await Promise.all([
     composeAssessmentOutcomes(cohortFacts, { limiter, prompts: promptOverrides?.assessmentOutcomes }),
@@ -111,6 +113,7 @@ export async function runImpactPipelineInline(
 
   return {
     cohortFacts,
+    readiness,
     sections: {
       assessmentOutcomes,
       assessmentCategories,
