@@ -13,6 +13,8 @@ import { composeParticipantReasons } from '@/lib/compose/participant-reasons';
 import { composeKeyAreasChallenges } from '@/lib/compose/key-areas-challenges';
 import { composeKeyThemes } from '@/lib/compose/key-themes';
 import type { CohortFacts, SectionOutput, SessionFacts } from '@/types/schemas';
+import { aggregateDemographics, type DemographicsSummary } from '@/lib/mock-sessions/demographics';
+import { aggregateZipPoints, type LngLat } from '@/lib/mock-sessions/geo';
 
 const MAP_LIMIT = 8;
 
@@ -44,6 +46,8 @@ export type RunPipelineInlineResponse = {
   sections: PipelineSections;
   sessionFacts: SessionFacts[];
   meta: PipelineMeta;
+  demographics: DemographicsSummary;
+  reachPoints: LngLat[];
 };
 
 export type PromptOverridesBySection = {
@@ -101,6 +105,10 @@ export async function runImpactPipelineInline(
   // Build cohort facts + readiness (deterministic gates)
   const { facts: cohortFacts, readiness } = buildCohortFactsWithReadiness(sessionFacts);
 
+  // Deterministic demographics from application answers
+  const demographics = aggregateDemographics(rawSessions);
+  const reachPoints = aggregateZipPoints(rawSessions);
+
   const [assessmentOutcomes, assessmentCategories, overallImpact, strengthsImprovements, participantReasons, keyAreasChallenges, keyThemes] = await Promise.all([
     composeAssessmentOutcomes(cohortFacts, { limiter, prompts: promptOverrides?.assessmentOutcomes }),
     composeAssessmentCategories(cohortFacts, { limiter, prompts: promptOverrides?.assessmentCategories }),
@@ -129,6 +137,8 @@ export async function runImpactPipelineInline(
       skipped,
       mapLogs,
     },
+    demographics,
+    reachPoints,
   };
 }
 

@@ -1,11 +1,12 @@
 /**
  * Empty State Component
- * 
+ *
  * Displays when a dashboard panel doesn't meet readiness criteria.
  * Shows reasons and actionable steps to unlock the panel.
  */
 
 import React from 'react';
+import { Box, Flex, Text } from '@radix-ui/themes';
 
 interface EmptyStateProps {
   panelId: string;
@@ -34,81 +35,73 @@ export function EmptyState({
   reasons,
   unlock,
   inputs,
-  className = '',
+  className,
 }: EmptyStateProps) {
   const title = PANEL_TITLES[panelId] || 'Dashboard Panel';
-  
+
   return (
-    <div
-      className={`flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 ${className}`}
+    <Box
+      className={className}
+      style={{
+        border: '1px dashed var(--gray-5)',
+        borderRadius: 10,
+        background: 'var(--gray-2)',
+        padding: 12,
+      }}
     >
-      {/* Icon */}
-      <div className="mb-4">
+      <Flex align="center" gap="2" style={{ marginBottom: 6 }}>
+        {/* Small check icon */}
         <svg
-          className="w-12 h-12 text-gray-400 dark:text-gray-600"
+          width={18}
+          height={18}
+          viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          viewBox="0 0 24 24"
+          style={{ color: 'var(--gray-10)' }}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
+          <path d="M9 12l2 2 4-4" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M12 22a10 10 0 110-20 10 10 0 010 20z" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-      </div>
-      
-      {/* Title */}
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-        {title} Not Yet Available
-      </h3>
-      
-      {/* Reasons */}
-      {reasons.length > 0 && (
-        <div className="mb-4 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-            {reasons.length === 1 ? 'Reason:' : 'Reasons:'}
-          </p>
-          <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
-            {reasons.map((reason, idx) => (
-              <li key={idx}>• {reason}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      
-      {/* Unlock steps */}
-      {unlock.length > 0 && (
-        <div className="w-full max-w-md">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">
-            To unlock this panel:
-          </p>
-          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-2 bg-white dark:bg-gray-800 rounded-lg p-4">
-            {unlock.map((step, idx) => (
-              <li key={idx} className="flex items-start">
-                <span className="flex-shrink-0 w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs mr-2 mt-0.5">
-                  {idx + 1}
-                </span>
-                <span>{step}</span>
+        <Text weight="bold" size="2">
+          {title} not available yet
+        </Text>
+      </Flex>
+
+      {reasons?.length ? (
+        <Box style={{ marginBottom: 6 }}>
+          <Text size="1" color="gray">{reasons.length === 1 ? 'Reason:' : 'Reasons:'}</Text>
+          <ul style={{ margin: 4, paddingLeft: 16 }}>
+            {reasons.map((r, i) => (
+              <li key={i} style={{ fontSize: 12, color: 'var(--gray-10)' }}>
+                {r}
               </li>
             ))}
           </ul>
-        </div>
-      )}
-      
-      {/* Debug inputs (only in development) */}
-      {process.env.NODE_ENV === 'development' && inputs && (
-        <details className="mt-4 text-xs text-gray-500 dark:text-gray-500 w-full max-w-md">
-          <summary className="cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
-            Debug: View inputs
-          </summary>
-          <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded overflow-auto">
+        </Box>
+      ) : null}
+
+      {unlock?.length ? (
+        <Box>
+          <Text size="1" weight="bold">To unlock:</Text>
+          <ol style={{ margin: 4, paddingLeft: 16 }}>
+            {unlock.map((s, i) => (
+              <li key={i} style={{ fontSize: 12, color: 'var(--gray-10)' }}>
+                {s}
+              </li>
+            ))}
+          </ol>
+        </Box>
+      ) : null}
+
+      {process.env.NODE_ENV === 'development' && inputs ? (
+        <details style={{ marginTop: 6 }}>
+          <summary style={{ fontSize: 11, color: 'var(--gray-9)', cursor: 'pointer' }}>Debug: View inputs</summary>
+          <pre style={{ marginTop: 4, padding: 8, background: 'var(--gray-3)', borderRadius: 8, fontSize: 11 }}>
             {JSON.stringify(inputs, null, 2)}
           </pre>
         </details>
-      )}
-    </div>
+      ) : null}
+    </Box>
   );
 }
 

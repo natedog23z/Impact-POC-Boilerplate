@@ -31,6 +31,8 @@ import FlourishingOutcomesGrid from '@/components/dashboard/FlourishingOutcomesG
 import TestimonialsCard from '@/components/dashboard/TestimonialsCard';
 import { PanelGate } from '@/components/readiness/PanelGate';
 import { SURVEY_KEY_MAP } from '@/lib/mock-sessions/surveyKeys';
+import Demographics from '@/components/dashboard/Demographics';
+import HexReachMap from '@/components/dashboard/HexReachMap';
 import {
   OVERALL_IMPACT_SYSTEM_PROMPT,
   KEY_THEMES_SYSTEM_PROMPT,
@@ -594,6 +596,16 @@ export default function MockSessionsPage() {
 
     return (
       <>
+        {/* Program Reach Hex Map (deterministic from ZIPs) */}
+        <Box style={{ marginTop: 12 }}>
+          <HexReachMap points={data.reachPoints} />
+        </Box>
+
+        {/* Deterministic Demographics always next */}
+        <Box style={{ marginTop: 12 }}>
+          <Demographics ages={data.demographics.ageBuckets} genders={data.demographics.genderCounts} total={data.demographics.total} />
+        </Box>
+
         <Box style={{ marginTop: 12, overflow: 'visible' }}>
         <Flex gap="4" align="stretch" wrap="wrap">
           <Box style={{ flex: 1, minWidth: 320 }}>
