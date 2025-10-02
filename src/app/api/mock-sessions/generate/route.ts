@@ -134,6 +134,7 @@ export async function POST(req: Request) {
     const baseParse = parseMockSession(payload.exampleText);
     const trimmedExample = payload.exampleText.trim();
     const surveyTemplate = collectSurveyTemplate(baseParse);
+    const forceCompleteSurveys = (surveyTemplate.pre?.length ?? 0) > 0 && (surveyTemplate.post?.length ?? 0) > 0;
     const lockedHeaderBlock = extractProgramHeaderBlock(trimmedExample);
     const milestoneOutline = extractMilestoneOutline(trimmedExample);
     const versionDetails = extractVersionDetailsRecord(trimmedExample);
@@ -152,6 +153,7 @@ export async function POST(req: Request) {
         idx,
         payload,
         exampleSignals: exampleHandoff,
+        forceCompleteSurveys,
       }),
     );
 
@@ -427,8 +429,9 @@ function createOmissionPlan(options: {
   rng: () => number;
   applicationAnswerCount: number;
   maxPlanItems: number;
+  forceCompleteSurveys?: boolean;
 }): OmissionPlan {
-  const { surveyTemplate, omitProbability, rng, applicationAnswerCount, maxPlanItems } = options;
+  const { surveyTemplate, omitProbability, rng, applicationAnswerCount, maxPlanItems, forceCompleteSurveys } = options;
 
   const plan: OmissionPlan = {
     programApplicationIndexes: [],
@@ -459,14 +462,16 @@ function createOmissionPlan(options: {
     .map((qa) => qa.key)
     .filter((key) => surveyTemplate.post.some((qa) => qa.key === key));
 
-  for (const key of pairableKeys) {
-    const omitPre = rng() < omitProbability;
-    const omitPost = rng() < omitProbability && !omitPre;
-    if (omitPre) {
-      plan.surveyOmissions.pre.push(key);
-    }
-    if (omitPost) {
-      plan.surveyOmissions.post.push(key);
+  if (!forceCompleteSurveys) {
+    for (const key of pairableKeys) {
+      const omitPre = rng() < omitProbability;
+      const omitPost = rng() < omitProbability && !omitPre;
+      if (omitPre) {
+        plan.surveyOmissions.pre.push(key);
+      }
+      if (omitPost) {
+        plan.surveyOmissions.post.push(key);
+      }
     }
   }
 
@@ -476,7 +481,7 @@ function createOmissionPlan(options: {
         !plan.surveyOmissions.pre.includes(key) && !plan.surveyOmissions.post.includes(key),
     ).length;
 
-  while (keptCount() < 2 && (plan.surveyOmissions.pre.length || plan.surveyOmissions.post.length)) {
+  while (!forceCompleteSurveys && keptCount() < 2 && (plan.surveyOmissions.pre.length || plan.surveyOmissions.post.length)) {
     if (plan.surveyOmissions.post.length && (!plan.surveyOmissions.pre.length || rng() < 0.5)) {
       plan.surveyOmissions.post.pop();
     } else if (plan.surveyOmissions.pre.length) {
@@ -552,6 +557,7 @@ function canonicalizeRawSession(
   mdParsed: RawSession | undefined,
   scenario: ScenarioPlan,
   rng: () => number,
+  forceCompleteSurveys: boolean,
 ): any {
   const clone = Array.isArray(raw.milestones) ? [...raw.milestones] : [];
 
@@ -674,16 +680,38 @@ function canonicalizeRawSession(
     const keysPre = Object.keys(pre.answers || {});
     const keysPost = Object.keys(post.answers || {});
     const pairable = SURVEY_KEYS.map((s) => s.key).filter((k) => keysPre.includes(k) && keysPost.includes(k));
-    const numericPairCount = pairable.filter((k) => Number.isInteger(pre.answers?.[k]) && Number.isInteger(post.answers?.[k])).length;
-    if (numericPairCount < 2) {
+
+    if (forceCompleteSurveys) {
+      // Fill all template keys present in both pre and post (no nulls)
       const templateKeys = surveyTemplate.pre
         .map((qa) => qa.key)
         .filter((k) => surveyTemplate.post.some((qa) => qa.key === k));
       for (const k of templateKeys) {
-        if (!Number.isInteger(pre.answers?.[k])) pre.answers[k] = 5; // default mid-scale if missing
-        if (!Number.isInteger(post.answers?.[k])) post.answers[k] = 5;
-        const nowPairable = Number.isInteger(pre.answers?.[k]) && Number.isInteger(post.answers?.[k]);
-        if (nowPairable && pairable.length + 1 >= 2) break;
+        if (!Number.isInteger(pre.answers?.[k])) {
+          const spec = (SURVEY_KEY_MAP as any)[k];
+          const min = spec?.scale?.min ?? 1;
+          const max = spec?.scale?.max ?? 10;
+          pre.answers[k] = Math.max(min, Math.min(max, 4 + Math.round(rng() * 3))); // 4–7 range
+        }
+        if (!Number.isInteger(post.answers?.[k])) {
+          const spec = (SURVEY_KEY_MAP as any)[k];
+          const min = spec?.scale?.min ?? 1;
+          const max = spec?.scale?.max ?? 10;
+          post.answers[k] = Math.max(min, Math.min(max, 4 + Math.round(rng() * 3)));
+        }
+      }
+    } else {
+      const numericPairCount = pairable.filter((k) => Number.isInteger(pre.answers?.[k]) && Number.isInteger(post.answers?.[k])).length;
+      if (numericPairCount < 2) {
+        const templateKeys = surveyTemplate.pre
+          .map((qa) => qa.key)
+          .filter((k) => surveyTemplate.post.some((qa) => qa.key === k));
+        for (const k of templateKeys) {
+          if (!Number.isInteger(pre.answers?.[k])) pre.answers[k] = 5; // default mid-scale if missing
+          if (!Number.isInteger(post.answers?.[k])) post.answers[k] = 5;
+          const nowPairable = Number.isInteger(pre.answers?.[k]) && Number.isInteger(post.answers?.[k]);
+          if (nowPairable && pairable.length + 1 >= 2) break;
+        }
       }
     }
 
@@ -880,8 +908,9 @@ async function generateSession(options: {
   idx: number;
   payload: ValidatedPayload;
   exampleSignals: ExampleSignals;
+  forceCompleteSurveys: boolean;
 }): Promise<GenerateResult> {
-  const { baseMarkdown, baseRawSession, surveyTemplate, lockedHeaderBlock, milestoneOutline, sentiment, idx, payload, exampleSignals } = options;
+  const { baseMarkdown, baseRawSession, surveyTemplate, lockedHeaderBlock, milestoneOutline, sentiment, idx, payload, exampleSignals, forceCompleteSurveys } = options;
 
   const seedUsed = `${payload.seedLabel}:${idx + 1}`;
   const sessionId = createSessionId(payload.seedLabel, idx);
@@ -908,6 +937,7 @@ async function generateSession(options: {
     rng,
     applicationAnswerCount,
     maxPlanItems,
+    forceCompleteSurveys,
   });
 
   const attempts = [false, true];
@@ -964,6 +994,7 @@ async function generateSession(options: {
         mdParsed,
         scenario,
         rng,
+        forceCompleteSurveys,
       );
 
       const jsonFooter = JSON.stringify(canonical, null, 2);
