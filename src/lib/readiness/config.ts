@@ -74,14 +74,14 @@ export const DEFAULT_READINESS_CONFIG: ReadinessConfig = {
   version: 'readiness.v1',
   
   cohort: {
-    minPairedSurveys: 10,
+    minPairedSurveys: 5,
     maxNullRatePre: 0.15,  // 15% null rate tolerance
     maxNullRatePost: 0.15,
   },
   
   panels: {
     overallImpact: {
-      minPaired: 10,
+      minPaired: 5,
     },
     improvementDonut: {
       minPaired: 5,

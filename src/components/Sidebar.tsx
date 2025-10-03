@@ -119,8 +119,8 @@ export function Sidebar() {
 
           {/** Impact Reports removed per request */}
 
-          {/* Mock Sessions tool */}
-          <Link href="/tools/mock-sessions">
+          {/* Sandbox Tools */}
+          <Link href="/tools">
             <Box
               style={{
                 padding: 12,
@@ -141,7 +141,7 @@ export function Sidebar() {
                   fontWeight: 400,
                   lineHeight: '24px',
                 }}>
-                  Mock Sessions
+                  Sandbox Tools
                 </Text>
               </Flex>
             </Box>

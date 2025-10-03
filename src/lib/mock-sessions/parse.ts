@@ -420,17 +420,22 @@ const parseMilestones = (section: string): Milestone[] => {
   const milestones: Milestone[] = [];
 
   for (const segment of segments) {
-  const [metaPart, ...restParts] = segment.split(/\n\s*-\s*(Applicant Survey Milestone|Meeting Milestone|Outcome Reporting Milestone|Reflection Milestone|Online Activity Milestone)/i);
-    if (!restParts.length) {
-      throw new ParseError('Unable to detect milestone type');
+    // Detect milestone type line generically: "- Xxxxx Milestone"
+    const typeLineRegex = /\n\s*-\s*([A-Za-z ]+?)\s*Milestone\s*\n/i;
+    const typeMatch = typeLineRegex.exec('\n' + segment);
+    if (!typeMatch || typeMatch.index === undefined) {
+      console.warn('Skipping milestone: unable to detect type line');
+      continue;
     }
 
+    const typeRaw = typeMatch[1].trim().toLowerCase();
+    const metaPart = segment.slice(0, typeMatch.index - 1); // remove leading added \n
+    // Remove the type line from body
+    const afterTypeStart = typeMatch.index - 1 + typeMatch[0].length;
+    const body = segment.slice(afterTypeStart).trim();
+
     const meta = parseBulletRecord(metaPart);
-    const typeIndicator = restParts[0].trim().toLowerCase();
-    const body = restParts
-      .slice(1)
-      .join('\n')
-      .trim();
+    const typeIndicator = typeRaw;
 
   const base = {
     title: emptyToUndefined(meta['Title']),
@@ -438,7 +443,7 @@ const parseMilestones = (section: string): Milestone[] => {
     completedAt: emptyToUndefined(meta['Completed at']),
   };
 
-    if (typeIndicator.startsWith('applicant survey')) {
+    if (typeIndicator.startsWith('applicant survey') || typeIndicator.startsWith('scholarship survey')) {
       milestones.push(parseApplicantSurveyMilestone(body, base));
       continue;
     }
@@ -446,7 +451,7 @@ const parseMilestones = (section: string): Milestone[] => {
       milestones.push(parseMeetingMilestone(body, base));
       continue;
     }
-    if (typeIndicator.startsWith('outcome reporting')) {
+    if (typeIndicator.startsWith('outcome reporting') || typeIndicator.startsWith('outcome note')) {
       milestones.push(parseOutcomeNoteMilestone(body, base));
       continue;
     }
@@ -458,8 +463,15 @@ const parseMilestones = (section: string): Milestone[] => {
       milestones.push(parseOnlineActivityMilestone(body, base));
       continue;
     }
+    // Ignore Administrative/other task milestones in cohort examples
+    if (typeIndicator.startsWith('administrative task')) {
+      // Non-essential for downstream facts; safely skip
+      continue;
+    }
 
-    throw new ParseError(`Unknown milestone type: ${typeIndicator}`);
+    // If the type is unknown, skip rather than failing the whole parse
+    console.warn(`Unknown milestone type encountered and skipped: ${typeIndicator}`);
+    continue;
   }
 
   return milestones;
@@ -484,11 +496,24 @@ const findMilestonesSection = (content: string): string => {
   for (const heading of candidates) {
     const loc = locateHeading(content, heading);
     if (loc) {
-      return sliceBetween(content, heading, 'Overall session outcome reports:');
+      // End at the next major section or end of content
+      const ends = [
+        'Overall session outcome reports:',
+        'Overall Session Outcome Reports:',
+        'Overall outcome reports:',
+        'Overall',
+      ];
+      for (const endHeading of ends) {
+        const slice = (() => {
+          try { return sliceBetween(content, heading, endHeading); } catch { return null; }
+        })();
+        if (slice) return slice;
+      }
+      return sliceBetween(content, heading);
     }
   }
   // Fallback to original (will throw detailed error)
-  return sliceBetween(content, 'Session Milestones:', 'Overall session outcome reports:');
+  return sliceBetween(content, 'Session Milestones:', undefined as any);
 };
 
 export const parseMockSession = (markdown: string): RawSession => {
@@ -497,12 +522,42 @@ export const parseMockSession = (markdown: string): RawSession => {
 
   const { programId, sessionId } = deriveIds(content);
 
-  const demographicsSection = sliceBetween(content, 'Participant Demographics:', 'Program Application:');
-  const applicationSection = sliceBetween(content, 'Program Application:', 'Scholarship Application:');
-  const milestonesSection = findMilestonesSection(content);
+  let demographicsSection = '';
+  let applicationSection = '';
+  let milestonesSection = '';
+
+  // Demographics section: stop at Program Application or Scholarship Application
+  try {
+    demographicsSection = sliceBetween(content, 'Participant Demographics:', 'Program Application:');
+  } catch {
+    try {
+      demographicsSection = sliceBetween(content, 'Participant Demographics:', 'Scholarship Application:');
+    } catch {
+      console.warn(`Session ${sessionId}: Missing demographics section`);
+    }
+  }
+
+  // Application section: allow both Program Application and Scholarship Application (fallback)
+  try {
+    applicationSection = sliceBetween(content, 'Program Application:', 'Scholarship Application:');
+  } catch {
+    try {
+      // Some cohort examples omit Program Application entirely; synthesize from Scholarship Q/A if present
+      const scholarshipOnly = sliceBetween(content, 'Scholarship Application:', 'Session Milestones:');
+      applicationSection = scholarshipOnly;
+    } catch {
+      console.warn(`Session ${sessionId}: Missing application section`);
+    }
+  }
+
+  try {
+    milestonesSection = findMilestonesSection(content);
+  } catch (error) {
+    throw new ParseError(`Session ${sessionId}: Missing milestones section - ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
 
   const demographics = parseBulletRecord(demographicsSection);
-  const applicationRaw = parseApplication(applicationSection);
+  const applicationRaw = parseApplication(applicationSection || '');
   const application =
     applicationRaw.reasons.length || applicationRaw.challenges.length
       ? {
@@ -557,4 +612,149 @@ export const extractMilestoneOutline = (markdown: string) => {
     };
   });
   return outline;
+};
+
+/**
+ * Extracts multiple sessions from a cohort markdown file
+ * 
+ * Splits by repeated "Version (...) Details:" headings, preserving the most recent
+ * "Offering (...) Details:" header for each session block.
+ */
+export const extractSessionsFromCohortMarkdown = (markdown: string): {
+  sessions: RawSession[];
+  skipped: Array<{ index: number; versionId: string; error: string }>;
+} => {
+  const normalized = normalizeInput(markdown);
+  const { content } = removeJsonFooter(normalized);
+
+  // Find all Version Details headings (primary) and, as fallback, all Session Milestones starts (secondary)
+  const versionRegex = /^\s*Version\s*\(([^)]+)\)\s*Details:\s*$/gim;
+  let versionMatches: Array<RegExpExecArray & { index: number }> = [...content.matchAll(versionRegex)] as any;
+
+  // If there are fewer than 10 versions but many milestone sections, treat each milestones block as a new session start
+  if (versionMatches.length < 10) {
+    const sessionMilestonesRegex = /\n\s*Session\s+Milestones\s*:/gim;
+    const milestonesStarts = [...content.matchAll(sessionMilestonesRegex)];
+    if (milestonesStarts.length > versionMatches.length) {
+      // Build synthetic version anchors just before each milestones block
+      versionMatches = milestonesStarts.map((m, idx) => {
+        const fakeIndex = Math.max(0, (m.index || 0) - 40);
+        const fake: RegExpExecArray & { index: number } = Object.assign([] as any, {
+          0: 'Version (synthetic) Details:',
+          index: fakeIndex,
+          input: content,
+          groups: undefined as any,
+        });
+        (fake as any)[1] = `synthetic-${idx + 1}`;
+        return fake;
+      });
+    }
+  }
+
+  if (versionMatches.length === 0) {
+    throw new ParseError('No Version Details sections found in cohort file');
+  }
+
+  // Find all Offering Details headings
+  const offeringRegex = /^\s*Offering\s*\(([^)]+)\)\s*Details:\s*$/gim;
+  const offeringMatches = [...content.matchAll(offeringRegex)];
+
+  const sessions: RawSession[] = [];
+  const skipped: Array<{ index: number; versionId: string; error: string }> = [];
+
+  for (let i = 0; i < versionMatches.length; i++) {
+    const versionMatch = versionMatches[i];
+    const versionId = versionMatch[1] ?? `synthetic-${i + 1}`;
+    const versionStart = versionMatch.index!;
+    
+    // Find the next version boundary (or end of file)
+    const nextVersionStart = versionMatches[i + 1]?.index ?? content.length;
+    
+    // Find the most recent Offering heading before this Version
+    let offeringBlock = '';
+    let foundOffering = false;
+    for (const offeringMatch of offeringMatches) {
+      if (offeringMatch.index! < versionStart) {
+        // Use the most recent offering block before this version
+        const offeringStart = offeringMatch.index!;
+        // Find the end of the offering section (stops at the first Version line after it)
+        const firstVersionAfterOffering = versionMatches.find(vm => vm.index! > offeringStart);
+        const offeringEnd = firstVersionAfterOffering?.index ?? versionStart;
+        offeringBlock = content.slice(offeringStart, Math.min(offeringEnd, versionStart));
+        foundOffering = true;
+      }
+    }
+
+    // If no offering found before this version, use the first offering in the file
+    if (!foundOffering && offeringMatches.length > 0) {
+      const firstOffering = offeringMatches[0];
+      const offeringStart = firstOffering.index!;
+      const firstVersionAfterOffering = versionMatches.find(vm => vm.index! > offeringStart);
+      const offeringEnd = firstVersionAfterOffering?.index ?? versionStart;
+      offeringBlock = content.slice(offeringStart, Math.min(offeringEnd, versionStart));
+    }
+
+    // Build primary block: Version ... up to next Version
+    const baseBlock = content.slice(versionStart, nextVersionStart);
+
+    // Attempt 1: Parse base block as-is
+    const attempts: string[] = [baseBlock];
+
+    // Attempt 2: Prepend offering header if available
+    if (offeringBlock.trim()) {
+      attempts.push(offeringBlock + '\n' + baseBlock);
+    }
+
+    // Attempt 3: Trim at visible hard separators within the block
+    const trimAtSeparator = (text: string) => {
+      const patterns = [
+        /\n\s*-{10,}\s*\n\s*=+\s*\n/,
+        /\n\s*=+\s*\n\s*Version\s*\(/i,
+        /\n\s*=+\s*\n/,
+      ];
+      for (const re of patterns) {
+        const m = re.exec(text);
+        if (m && m.index !== undefined) return text.slice(0, m.index + m[0].length);
+      }
+      return text;
+    };
+    attempts.push(trimAtSeparator(baseBlock));
+    if (offeringBlock.trim()) attempts.push(trimAtSeparator(offeringBlock + '\n' + baseBlock));
+
+    // Attempt 4: If block lacks "Session Milestones:", extend forward up to 50k chars
+    if (!/\bSession\s+Milestones\s*:/i.test(baseBlock)) {
+      const extended = content.slice(versionStart, Math.min(content.length, versionStart + 50000));
+      attempts.push(offeringBlock + '\n' + extended);
+    }
+
+    let parsedOk = false;
+    for (const candidate of attempts) {
+      try {
+        const session = parseMockSession(candidate);
+        sessions.push(session);
+        parsedOk = true;
+        break;
+      } catch (err) {
+        // try next candidate
+      }
+    }
+
+    if (!parsedOk) {
+      const lastError = 'Unable to parse after multiple attempts';
+      console.warn(`Failed to parse session ${i + 1} (${versionId}) after fallbacks.`);
+      skipped.push({ index: i, versionId, error: lastError });
+    }
+  }
+
+  // Assign stable synthetic session IDs for cohort uploads (avoid using version IDs)
+  for (let i = 0; i < sessions.length; i++) {
+    const sid = `cohort-${String(i + 1).padStart(3, '0')}`;
+    (sessions[i] as any).sessionId = sid;
+  }
+
+  if (sessions.length === 0) {
+    throw new ParseError(`Failed to parse any sessions from cohort file. ${skipped.length} sessions were skipped.`);
+  }
+
+  return { sessions, skipped };
 };
