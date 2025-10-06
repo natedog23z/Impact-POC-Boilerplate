@@ -15,6 +15,7 @@ import {
   extractSessionSignals,
 } from '@/lib/agents/extract-session';
 import { sessionFactsSchema, type SessionFacts } from '@/types/schemas';
+import { isApplicationTaggerEnabled, tagApplicationReasons } from '@/lib/agents/tag-application-reasons';
 
 const SESSION_FACTS_VERSION = 'session-facts@0.1.0';
 
@@ -54,6 +55,19 @@ export async function buildSessionFacts(
   const createdAt = options.now ? options.now() : new Date().toISOString();
   const version = options.version ?? SESSION_FACTS_VERSION;
 
+  // Derive application reasons deterministically (raw), with optional LLM tagging override
+  const rawReasons = dedupeStrings(raw.application?.reasons ?? []).slice(0, 10);
+  let finalReasons = rawReasons;
+  let taggingModel = 'none';
+  if (isApplicationTaggerEnabled() && rawReasons.length) {
+    const { tags, model } = await tagApplicationReasons(rawReasons, { limiter: options.limiter, model: options.model, minConfidence: 0.6 });
+    // If LLM produced confident tags, prefer them; otherwise fall back to raw
+    if (tags.length) {
+      finalReasons = tags.slice(0, 10);
+      taggingModel = model;
+    }
+  }
+
   const factsInput: SessionFacts = sessionFactsSchema.parse({
     sessionId: raw.sessionId,
     programId: raw.programId,
@@ -62,7 +76,7 @@ export async function buildSessionFacts(
     strengths: extraction.strengths.slice(0, 6),
     improvements: extraction.improvements.slice(0, 6),
     themes: extraction.themes.slice(0, 6),
-    reasons: dedupeStrings(raw.application?.reasons ?? []).slice(0, 10),
+    reasons: finalReasons,
     challenges: dedupeStrings(raw.application?.challenges ?? []).slice(0, 10),
     quotes: extraction.quotes.slice(0, 2).map((quote) => ({
       sessionId: quote.sessionId,
@@ -85,7 +99,7 @@ export async function buildSessionFacts(
       programId: raw.programId,
       pairedAssessments: assessmentResult.pairedCount,
       availableAssessments: assessmentResult.availableCount,
-      extractionModel: extraction.model,
+      extractionModel: extraction.model || taggingModel,
       extractionVersion: EXTRACTION_AGENT_VERSION,
     },
   };

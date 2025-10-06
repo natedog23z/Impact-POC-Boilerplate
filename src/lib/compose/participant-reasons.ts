@@ -84,7 +84,7 @@ function buildPromptPayload(
     dataQualityNotes: cohort.dataQualityNotes.slice(0, 6),
   };
   return `CohortFacts data (reasons only):\n${JSON.stringify(data, null, 2)}\n\n` +
-    `Using only this data, write: 1) a 2–3 sentence overview (prose) describing why participants sought {offering name} in neutral, respectful language; 2) up to 6 reason items with {title, description, percent} where percent is already provided.`;
+    `Task: Using only the above, produce donor-facing content that explains why participants applied and what they hope to gain. Respect any data limitations noted. Return JSON per schema with a concise overview and up to 6 reason items (use provided percents).`;
 }
 
 

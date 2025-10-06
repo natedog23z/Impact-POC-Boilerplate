@@ -43,7 +43,14 @@ export function buildCohortFacts(
   const topImprovements = buildTagCounts(cohortSessions, (session) => session.improvements);
   const topThemes = buildTagCounts(cohortSessions, (session) => session.themes);
   const topChallenges = buildTagCounts(cohortSessions, (session) => session.challenges);
-  const topReasons = buildTagCounts(cohortSessions, (session) => session.reasons);
+  // Normalize free-text reasons into canonical tags and de-duplicate per session before counting
+  const topReasons = buildTagCounts(
+    cohortSessions.map((s) => ({
+      ...s,
+      reasons: Array.from(new Set(s.reasons.map(normalizeReasonTag))),
+    })),
+    (session) => session.reasons,
+  );
   const exemplarQuotes = pickExemplarQuotes(cohortSessions);
   const dataQualityNotes = buildDataQualityNotes({
     sessions: cohortSessions,
@@ -196,6 +203,69 @@ function buildTagCounts(sessions: SessionFacts[], selector: TagSelector): TagCou
   return sorted.slice(0, TAG_LIMIT);
 }
 
+// Program-agnostic normalization: clean punctuation/whitespace, drop low-signal entries,
+// compact to a short, informative phrase (2–4 tokens), then title-case. No domain mappings.
+function normalizeReasonTag(raw: string): string {
+  const value = (raw ?? '').toString().normalize('NFKC');
+  const lower = value
+    .replace(/[“”\"'`]+/g, '')
+    .replace(/[\/_]+/g, ' ')
+    .replace(/\s*&\s*/g, ' and ')
+    .replace(/[^a-zA-Z0-9\s\-]/g, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!lower) return '';
+
+  // Drop purely numeric or tiny tokens
+  if (/^\d+$/.test(lower)) return '';
+
+  // Tokenize and remove stopwords and filler phrases
+  const stop = new Set([
+    'i','we','my','our','me','us','they','their','theirs','you','your',
+    'and','or','of','the','in','on','for','to','a','an','with','from','at','as','by','into','about','over','after','before','through','between','during','without','within','across','under','again',
+    'want','hope','would','like','help','learn','more','better','grow','growth','improve','improving','improvement','develop','development','seeking','seek','seeks','seeking',
+    'am','is','are','be','been','being','very','really','deeply','have','has','had',
+    'just','come','came','go','went','get','got','make','made','take','took','give','gave','put','see','saw','look','looked','find','found','bring','brought','keep','kept','start','started','begin','began','continue','continued','end','ended',
+    'up','out','back','still','even','also','so','that','than','then','there','here','this','these','those','dont','don\'t','not','no',
+    'deepen','strengthen','strengthening',
+    'program','course','class','workshop','cohort','journey','experience','participate','participation',
+  ]);
+
+  const rawTokens = lower.split(' ').filter((w) => {
+    if (!w) return false;
+    if (stop.has(w)) return false;
+    if (/^\d+$/.test(w)) return false;
+    if (/^\d+(st|nd|rd|th)$/.test(w)) return false;
+    if (w.length < 3) return false;
+    return true;
+  });
+  // De-duplicate while preserving order
+  const seen = new Set<string>();
+  const tokens: string[] = [];
+  const seenRoots = new Set<string>();
+  for (const w of rawTokens) {
+    const root = w.slice(0, 4);
+    if (seen.has(w)) continue;
+    if (seenRoots.has(root)) continue; // avoid near-duplicates like burn/burned/burnout
+    seen.add(w);
+    seenRoots.add(root);
+    tokens.push(w);
+  }
+  if (tokens.length === 0) return '';
+
+  // Keep order; cap to 2–4 words for readability
+  const compact = tokens.slice(0, Math.min(4, Math.max(2, tokens.length)));
+
+  // Title-case with small-word rule
+  const small = new Set(['and','or','of','the','in','on','for','to','a','an','with']);
+  const titled = compact
+    .map((w, i) => (small.has(w) && i > 0 ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ');
+
+  return titled.slice(0, 80);
+}
+
 function pickExemplarQuotes(sessions: SessionFacts[]): SessionFacts['quotes'] {
   const pool = stableSort(
     sessions.flatMap((session) => session.quotes.map((quote, index) => ({ quote, index, sessionId: session.sessionId }))),
@@ -275,6 +345,14 @@ function buildDataQualityNotes(input: DataQualityInput): string[] {
 
   if (completionMedian < 50) {
     notes.push('Median milestone completion is below 50%, suggesting participants are early in the program.');
+  }
+
+  // Coverage of application reasons
+  const sessionsWithReasons = sessions.filter((s) => Array.isArray(s.reasons) && s.reasons.length > 0).length;
+  if (sessionsWithReasons === 0) {
+    notes.push('Application reasons are missing across the cohort.');
+  } else if (sessionsWithReasons < nSessions) {
+    notes.push(`Application reasons available for ${sessionsWithReasons} of ${nSessions} sessions.`);
   }
 
   return notes.slice(0, 12);

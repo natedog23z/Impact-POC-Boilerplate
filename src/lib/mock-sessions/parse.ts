@@ -199,18 +199,54 @@ const parseApplication = (section: string) => {
   const reasons: string[] = [];
   const challenges: string[] = [];
 
+  // Helpers to decide which Q/A belong in reasons vs metadata
+  const isReasonQuestion = (q: string) => {
+    const lower = q.toLowerCase();
+    return (
+      /why\b/.test(lower) ||
+      /what brings you here/.test(lower) ||
+      /hope to (?:accomplish|gain|learn|grow)/.test(lower) ||
+      /aspirations|expectations/.test(lower) ||
+      /led you to consider/.test(lower) ||
+      /goals?/.test(lower)
+    );
+  };
+
+  const isExcludedQuestion = (q: string) => {
+    const lower = q.toLowerCase();
+    return (
+      /organization name|org name|company|employer/.test(lower) ||
+      /current role|role in ministry|professional role/.test(lower) ||
+      /gender|birth year|zip code|age/.test(lower) ||
+      /level of awareness/.test(lower)
+    );
+  };
+
+  const isSubstantiveAnswer = (a: string) => {
+    const alphaLen = a.replace(/[^a-zA-Z]/g, '').length;
+    return alphaLen >= 7; // avoid one-word labels like "Male", "Staff"
+  };
+
   for (const entry of entries) {
-    const lower = entry.question.toLowerCase();
+    const q = entry.question;
+    const a = entry.answer.trim();
+    if (!a) continue;
+
+    const lower = q.toLowerCase();
     if (lower.includes('challenges') || lower.includes('struggles')) {
-      if (entry.answer) challenges.push(entry.answer);
+      challenges.push(a);
       continue;
     }
-    if (lower.includes('hope to gain') || lower.includes('led you to consider')) {
-      if (entry.answer) reasons.push(entry.answer);
+    if (isExcludedQuestion(q)) {
       continue;
     }
-    if (entry.answer) {
-      reasons.push(entry.answer);
+    if (isReasonQuestion(q)) {
+      reasons.push(a);
+      continue;
+    }
+    // Fallback: treat sufficiently descriptive answers as reasons
+    if (isSubstantiveAnswer(a)) {
+      reasons.push(a);
     }
   }
 
